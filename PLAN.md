@@ -300,11 +300,12 @@ employee-portal/
 - [x] RohTre logos saved to `public/logos/`, site icon to `app/icon.svg`
 
 ### Phase 1 — Design System
-- [ ] Add the `@theme` tokens (§1.1–1.3) to `globals.css` and load the Plus Jakarta Sans font
-- [ ] Build UI primitives: Button (primary/secondary/ghost), Card, Input, PasswordInput, Select, Textarea, Badge (success/warning/brand/info), Modal, Table, Tabs, Skeleton, Toast, EmptyState
-- [ ] Build the route-progress bar and the logo loader
-- [ ] Build the app shell: dark rail sidebar, top bar, mobile drawer
-- [ ] Add a `/styleguide` page to compare side by side with the reference site
+- [x] Add the `@theme` tokens (§1.1–1.3) to `app/globals.css` and load the Plus Jakarta Sans font (`app/layout.tsx`)
+- [x] Build UI primitives in `components/ui/`: Button (primary/secondary/ghost/danger, sm/md/lg, loading), Card, Input, PasswordInput, Select, Textarea, Badge, Modal, Table, Tabs, Skeleton, EmptyState, Eyebrow, PageHeader, StatTile, Avatar, plus toasts (`sonner`)
+- [x] Build the route-progress bar and the logo loader (also used as `app/loading.tsx`)
+- [x] Build the app shell (`components/layout/app-shell.tsx`): dark rail sidebar with grouped nav (admin and employee menus in `nav.ts`), top bar with today's date, mobile drawer
+- [x] Add a `/styleguide` page (the home page redirects there until Phase 2). Checked on desktop in Chrome.
+- [ ] Check the mobile layout on a real phone or in DevTools (couldn't resize the browser window in this session)
 
 ### Phase 2 — Database & Auth
 - [ ] Write migrations for every table in §4, with RLS policies and helper functions
@@ -381,3 +382,4 @@ employee-portal/
 | 2026-11-12 | Researched seller.rohtremedia.com (design tokens, fonts, components, login layout). Created PLAN.md. |
 | 2026-11-12 | User answers applied: Next.js; Saturday is a full day; floating swaps need admin approval and have no limit; payslip is Basic + Performance Bonus + Extra Pay only (no deductions, no overtime rate); leave year Jan–Dec; logos approved. Removed salary_structures and overtime rate settings. |
 | 2026-11-12 | Phase 0 done (except the Supabase keys): scaffolded Next.js, installed libraries, added the Supabase client helpers, downloaded the logos, and the build passes. |
+| 2026-11-12 | Phase 1 done: design tokens, Plus Jakarta Sans, UI components, route-progress bar, logo loader, app shell (sidebar, top bar, mobile drawer), `/styleguide` page. Moved the Next.js dev badge to the bottom right so it doesn't cover the sidebar. Type-check, lint and build pass. |
