@@ -357,10 +357,21 @@ employee-portal/
 - [x] Tests: 18/18 (rules, permissions, the effect on day type, page rendering) with temporary holidays and employees, cleaned up afterwards
 
 ### Phase 6 — Leave Management
-- [ ] Admin: leave types, yearly policies, per-employee overrides, balance initialisation per year
-- [ ] Employee: balances view, apply form (full / half / range) with the live day-count preview
-- [ ] Approval queue for the admin, cancel for the employee, balance triggers
-- [ ] Show leave days in attendance and on the Today board
+- [x] Decided 2026-11-13: **no carry forward**; the admin sets quotas in the portal (defaults stay SL 12 / PL 12 / VL 6 / UL unlimited until changed)
+- [x] Migration `0007_leaves.sql`:
+  - `apply_leave`, `leave_preview`, `cancel_leave` and `review_leave` (approve / reject / revoke) RPCs
+  - `ensure_leave_year` copies the latest quotas into a new year and creates every employee's balance rows; it runs automatically when the admin opens the Leave page
+  - Days are counted by `day_info`, so Sundays, holidays and moved floating holidays are skipped. A half day counts 0.5, and the two halves of one day can be separate requests.
+  - Rules: reason required; no overlap; can't cross the year; at most 2 months per request; no full-day leave on days with attendance; balance checked (unpaid has no limit); a document is required if the type demands it
+  - Balances: applying reserves `pending`, approving moves it to `used`, reject or cancel releases it, revoking approved leave restores it. Employees can cancel pending leave, or approved leave before it starts.
+  - Private storage bucket `leave-attachments` (PDF / JPG / PNG / WebP, 5 MB): employees can upload only to their own folder; the owner or an admin can read
+- [x] Employee `/app/leaves`: balance rings per type, "Apply for leave" pop-up (type, Full day(s) / Half day with first or second half, dates, live preview of "uses X days, Y left, not counted: …", reason, attachment), request list (Upcoming / All) with cancel and a file button
+- [x] Admin `/admin/leaves`, three tabs plus a year switcher:
+  - **Requests**: approval queue (approve, reject with reason, open attachment), history with a status filter and Revoke, "on leave · next 14 days"
+  - **Balances**: employee × type grid of left / total; click a cell to override one person's allotment (can't go below used + pending)
+  - **Leave types & quotas**: days per year per type (optionally applied to everyone), add or edit types (name, code, colour, paid, limit, document required, visible)
+- [x] Approved leave already shows through `day_info`: the clock card says "on leave", the calendar and Today board show it, and clock-in is blocked
+- [x] Tests: leave rules 24/24, pages and attachments 12/12, with temporary data cleaned up afterwards
 
 ### Phase 7 — Overtime
 - [ ] Employee overtime log form and history
@@ -415,3 +426,4 @@ employee-portal/
 | 2026-11-13 | Phase 4 built: clock in/out with tasks, automatic statuses, nightly pg_cron cleanup, employee dashboard and attendance calendar, admin Today board with attendance fixes (migrations 0004 + 0005). Middleware now enforces the role area. Tests 19/19 + 13/13. Added `summary` and `is_late` columns to attendance (late is now tracked separately from half day). |
 | 2026-11-13 | Bug fix (reported by the user): pop-ups closed while typing. Cause: `Modal` re-ran its "on open" effect on every render because callers pass an inline `onClose`, which moved focus to the ✕ button, so the next space or Enter closed the pop-up. Fix: keep `onClose` in a ref, run the effect only when `open` changes, and never focus the ✕ button. Affects every pop-up. |
 | 2026-11-13 | Phase 5 built: holiday calendar management, floating-holiday swaps with admin approval (migration 0006), employee holidays page with next-holiday countdown. Tests 18/18. |
+| 2026-11-13 | Phase 6 built: full leave management (migration 0007, storage bucket for documents). No carry forward. Tests 24/24 + 12/12. The upload library on `/app/leaves` now loads only on submit (page JS 78 KB → 8.6 KB). |
