@@ -10,7 +10,7 @@ import { createClient } from "@supabase/supabase-js";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 dotenv.config({ path: join(root, ".env.local"), quiet: true });
 
-const [email, ...nameParts] = process.argv.slice(2);
+const [email, ...nameParts] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const fullName = nameParts.join(" ").trim();
 if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !fullName) {
   console.error('Usage: npm run create-admin -- admin@company.com "Full Name"');
@@ -54,7 +54,20 @@ if (pErr) {
   process.exit(1);
 }
 
-console.log("\nAdmin account created.");
-console.log("  Email:              " + email.toLowerCase());
-console.log("  Temporary password: " + tempPassword);
-console.log("\nLog in at /login. You will be asked to set a new password.\n");
+// With --save, write the password to a git-ignored file instead of the terminal.
+if (process.argv.includes("--save")) {
+  const { writeFileSync } = await import("node:fs");
+  const file = join(root, ".admin-temp-password.txt");
+  writeFileSync(
+    file,
+    `Email:              ${email.toLowerCase()}\nTemporary password: ${tempPassword}\n\nLog in at /login, set a new password, then DELETE this file.\n`,
+    { mode: 0o600 },
+  );
+  console.log(`\nAdmin account created for ${email.toLowerCase()}.`);
+  console.log(`Temporary password saved to ${file}\n`);
+} else {
+  console.log("\nAdmin account created.");
+  console.log("  Email:              " + email.toLowerCase());
+  console.log("  Temporary password: " + tempPassword);
+  console.log("\nLog in at /login. You will be asked to set a new password.\n");
+}

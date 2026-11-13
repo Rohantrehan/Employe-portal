@@ -295,7 +295,7 @@ employee-portal/
 - [x] `git init` and the first commit
 - [x] `.env.example` committed (real `.env.local` is git-ignored)
 - [x] `.env.local` has the project URL (`rfnjiayqzyhttbhpjfoc`) and `DATABASE_URL`
-- [ ] Add `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` to `.env.local` ← waiting on user
+- [x] Add `NEXT_PUBLIC_SUPABASE_ANON_KEY` (publishable) and `SUPABASE_SERVICE_ROLE_KEY` (secret) to `.env.local`. Both tested against the live API on 2026-11-13 ✅
 - [x] Install the libraries listed in §5
 - [x] Supabase clients: `lib/supabase/client.ts` (browser), `server.ts` (cookies), `admin.ts` (service role, server-only)
 - [x] RohTre logos saved to `public/logos/`, site icon to `app/icon.svg`
