@@ -294,7 +294,8 @@ employee-portal/
 - [x] Create the Next.js app (Next 15.5.4, TypeScript, App Router, Tailwind v4, ESLint) in this folder
 - [x] `git init` and the first commit
 - [x] `.env.example` committed (real `.env.local` is git-ignored)
-- [ ] Fill `.env.local` with the **user-provided** Supabase URL, anon key and service-role key ← waiting on user
+- [x] `.env.local` has the project URL (`rfnjiayqzyhttbhpjfoc`) and `DATABASE_URL`
+- [ ] Add `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` to `.env.local` ← waiting on user
 - [x] Install the libraries listed in §5
 - [x] Supabase clients: `lib/supabase/client.ts` (browser), `server.ts` (cookies), `admin.ts` (service role, server-only)
 - [x] RohTre logos saved to `public/logos/`, site icon to `app/icon.svg`
@@ -308,10 +309,14 @@ employee-portal/
 - [ ] Check the mobile layout on a real phone or in DevTools (couldn't resize the browser window in this session)
 
 ### Phase 2 — Database & Auth
-- [ ] Write migrations for every table in §4, with RLS policies and helper functions
-- [ ] Seed data: leave types, default policies, settings row, the first admin user
-- [ ] Build the login page (exact reference layout), middleware role routing, logout
-- [ ] Add the forced first-login password change
+- [x] Migration runner `npm run db:migrate` (`scripts/migrate.mjs`; tracks applied files in `ops.migrations`)
+- [x] `0001_core_schema.sql`: all 14 tables from §4, enums, RLS on every table, `is_admin()`, auto-profile trigger on new auth users (role read from `app_metadata`, which only the server can set), `mark_password_changed()`. Applied ✅
+- [x] `0002_seed_defaults.sql`: settings row, leave types SL/PL/VL/UL, 2026 + 2027 quotas (Sick 12, Paid 12, Vacation 6, Unpaid unlimited). Applied ✅
+- [x] Login page (reference layout), middleware session refresh and redirects, role layouts (`/admin` admin only, `/app` employee only), logout route, branded 404
+- [x] Forced first-login password change (`/change-password`)
+- [x] `npm run create-admin -- email "Full Name"` script (prints a one-time temporary password)
+- [ ] Create the first admin account ← needs the service-role key and the admin's email
+- [ ] Log in end to end and test that an employee cannot read another employee's data
 
 ### Phase 3 — Admin: Employees
 - [ ] Employee list, create (server action → `auth.admin.createUser`), edit, deactivate, reset password
@@ -383,3 +388,4 @@ employee-portal/
 | 2026-11-12 | User answers applied: Next.js; Saturday is a full day; floating swaps need admin approval and have no limit; payslip is Basic + Performance Bonus + Extra Pay only (no deductions, no overtime rate); leave year Jan–Dec; logos approved. Removed salary_structures and overtime rate settings. |
 | 2026-11-12 | Phase 0 done (except the Supabase keys): scaffolded Next.js, installed libraries, added the Supabase client helpers, downloaded the logos, and the build passes. |
 | 2026-11-12 | Phase 1 done: design tokens, Plus Jakarta Sans, UI components, route-progress bar, logo loader, app shell (sidebar, top bar, mobile drawer), `/styleguide` page. Moved the Next.js dev badge to the bottom right so it doesn't cover the sidebar. Type-check, lint and build pass. |
+| 2026-11-13 | Phase 2 (most of it): connected to the user's Supabase database, applied migrations 0001 + 0002, built login, change-password, logout, middleware, role-guarded layouts, the 404 page and the create-admin script. `/styleguide` now shows only in development. Waiting on the API keys to create the admin and test end to end. Default leave quotas are placeholders for the admin to adjust. |

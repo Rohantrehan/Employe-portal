@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation";
+import { getSession, homeFor } from "@/lib/auth";
 
-// Temporary: until login exists (Phase 2), send visitors to the styleguide.
-export default function Home() {
-  redirect("/styleguide");
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const session = await getSession();
+  if (!session?.profile) redirect("/login");
+  redirect(homeFor(session.profile.role));
 }
