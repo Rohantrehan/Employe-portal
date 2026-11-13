@@ -381,10 +381,15 @@ employee-portal/
 - [x] Tests: 16/16 with a temporary employee, cleaned up afterwards
 
 ### Phase 8 — Payroll & Payslips
-- [ ] Basic salary field on the employee profile
-- [ ] Monthly payroll screen: reference info (days, leaves, extra hours) plus 3 editable amounts (Basic, Performance Bonus, Extra Pay), with draft and publish
-- [ ] Payslip PDF template (branded) plus a download route with an ownership check
-- [ ] Employee payslip history and download
+- [x] Basic salary field on the employee profile (built in Phase 3)
+- [x] Migration `0009_payroll.sql`:
+  - `payroll_month(month)` (admin): one row per employee who had joined by month end, with working days (working + leave days, excluding Sundays and holidays), days present (half day = 0.5), leave days and approved extra hours, plus any saved slip
+  - `save_payslip` (draft only; snapshots the reference numbers; no future months; amounts ≥ 0)
+  - `set_payslips_published` (bulk publish / unpublish; paid slips can't be unpublished), `set_payslip_paid` (published only; date required and not in the future; optional reference), `delete_payslip_draft` (drafts only). All audit logged.
+- [x] Admin `/admin/payroll` (defaults to last month): month switcher, stat tiles (employees, total net, published, paid), editable sheet (Basic pre-filled from the profile, Bonus, Extra Pay, live Net), unsaved rows highlighted, "Save drafts (n)", "Publish drafts (n)", row menu (Preview PDF, Download PDF, Publish, Delete draft, Mark as paid with date and reference, Mark unpaid, Unpublish to edit), a warning when viewing the current, unfinished month
+- [x] Payslip PDF `/api/payslips/[id]/pdf` (`@react-pdf/renderer`, generated on demand): RohTre logo, Plus Jakarta Sans, red top bar, status chip (DRAFT / PAID ON / PAYMENT PENDING), employee details, attendance summary, earnings table, dark Net Pay bar, amount in words (Indian lakh/crore), payment reference, "computer-generated" note, "RohTre Media · Lucknow, India" footer. Amounts use "Rs." because the brand font has no ₹ glyph. Access is through RLS: employees get only their own published slips (404 otherwise); admins get all, including drafts.
+- [x] Employee `/app/payslips`: latest-payslip hero (net, breakdown, paid badge, View / Download PDF, attendance numbers), year total, table of all published slips with PDF download
+- [x] Tests: amount-in-words 11/11; payroll flow and PDF 20/20 (two runs). Sample PDF checked visually.
 
 ### Phase 9 — Dashboards & Graphs
 - [ ] Admin analytics dashboard (§3.9)
@@ -431,3 +436,4 @@ employee-portal/
 | 2026-11-13 | Phase 5 built: holiday calendar management, floating-holiday swaps with admin approval (migration 0006), employee holidays page with next-holiday countdown. Tests 18/18. |
 | 2026-11-13 | Phase 6 built: full leave management (migration 0007, storage bucket for documents). No carry forward. Tests 24/24 + 12/12. The upload library on `/app/leaves` now loads only on submit (page JS 78 KB → 8.6 KB). |
 | 2026-11-13 | Phase 7 built: extra hours, with employees logging (plus long-day suggestions from attendance) and admin approval and monthly totals (migration 0008). Tests 16/16. |
+| 2026-11-13 | Phase 8 built: payroll sheet, publish and paid workflow, branded payslip PDF with the Lucknow footer (as the user asked), employee payslips page (migration 0009; added `@fontsource/plus-jakarta-sans`; `serverExternalPackages: ["@react-pdf/renderer"]`). Fixes: `formatINR` now shows paise when present instead of rounding (₹38,750.50, not ₹38,751); the PDF logo is passed as bytes because a Windows `D:\` path was read as a URL. Tests 20/20. |

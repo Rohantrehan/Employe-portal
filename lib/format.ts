@@ -8,15 +8,17 @@ export function formatDate(value: string | Date | null | undefined) {
   return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: TZ }).format(d);
 }
 
-/** "₹25,000" (Indian digit grouping). */
+/** "₹25,000" or "₹38,750.50" (Indian digit grouping). Paise are shown whenever present, never rounded away. */
 export function formatINR(value: number | string | null | undefined, opts: { decimals?: boolean } = {}) {
   const n = Number(value ?? 0);
+  const safe = Number.isFinite(n) ? n : 0;
+  const showPaise = opts.decimals ?? Math.round(safe * 100) % 100 !== 0;
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
-    minimumFractionDigits: opts.decimals ? 2 : 0,
-    maximumFractionDigits: opts.decimals ? 2 : 0,
-  }).format(Number.isFinite(n) ? n : 0);
+    minimumFractionDigits: showPaise ? 2 : 0,
+    maximumFractionDigits: showPaise ? 2 : 0,
+  }).format(safe);
 }
 
 /** Today's date in IST as "YYYY-MM-DD". */
