@@ -317,12 +317,19 @@ employee-portal/
 - [x] `npm run create-admin -- email "Full Name"` script (prints a one-time temporary password)
 - [x] First admin account: the user created it in the Supabase dashboard, then it was promoted to admin (Rohan Trehan, RT-001; role set in both `profiles` and `app_metadata`)
 - [x] Logged out, `/`, `/admin` and `/app` redirect to `/login`. The login page renders on narrow screens.
-- [ ] Log in end to end and test that an employee cannot read another employee's data
+- [x] The user logged in as admin end to end ✅
+- [x] Security test passed (14/14) with a throwaway employee: they see only their own profile and balances, can't make themselves admin, change their salary, create payslips, add holidays or write the audit log, and logged-out visitors see nothing. The test user was deleted and the code counter reset.
 
 ### Phase 3 — Admin: Employees
-- [ ] Employee list, create (server action → `auth.admin.createUser`), edit, deactivate, reset password
-- [ ] Departments CRUD
-- [ ] Employee detail page with tabs
+- [x] Migration `0003_employees.sql`: new employees automatically get their current-year leave balances, plus `init_leave_balances()` (admin only) and the `log_action()` audit helper
+- [x] Employee list `/admin/employees`: Active / Deactivated / All tabs, search (name, email, code), department filter, card list on phones
+- [x] Add employee `/admin/employees/new`: creates the login (`auth.admin.createUser`) and fills the profile. Shows the temporary password once with copy buttons. Rolls back the login if saving the profile fails.
+- [x] Employee detail `/admin/employees/[id]`: edit all fields (email and role changes are synced to the login), at-a-glance card, leave-balance bars, reset password (new temporary password shown once), deactivate / re-activate (bans the login, history kept)
+- [x] Safety rules: an admin can't remove their own admin access, deactivate themselves, or reset their own password from here
+- [x] Departments: add, rename and delete in a pop-up on the employee list (employees in a deleted department are kept, with no department)
+- [x] Every admin action is written to `audit_log`
+- [ ] The user to click through the screens (create, edit, deactivate, reset) and report any issues
+- Later phases add Attendance / Leave / Payslip history to the detail page
 
 ### Phase 4 — Attendance & Daily Tasks
 - [ ] `clock_in` / `clock_out` RPCs with the rules from §3.3
@@ -391,3 +398,4 @@ employee-portal/
 | 2026-11-12 | Phase 1 done: design tokens, Plus Jakarta Sans, UI components, route-progress bar, logo loader, app shell (sidebar, top bar, mobile drawer), `/styleguide` page. Moved the Next.js dev badge to the bottom right so it doesn't cover the sidebar. Type-check, lint and build pass. |
 | 2026-11-13 | Phase 2 (most of it): connected to the user's Supabase database, applied migrations 0001 + 0002, built login, change-password, logout, middleware, role-guarded layouts, the 404 page and the create-admin script. `/styleguide` now shows only in development. Waiting on the API keys to create the admin and test end to end. Default leave quotas are placeholders for the admin to adjust. |
 | 2026-11-13 | Keys verified. The user created an account in the Supabase dashboard, which was promoted to admin (Rohan Trehan). Note: if an admin's role is changed by hand, update BOTH `profiles.role` and `auth.users.raw_app_meta_data.role`. |
+| 2026-11-13 | Phase 3 built: employee list, add, edit, deactivate, reset password, departments, automatic leave balances (migration 0003), audit logging, plus `lib/format.ts` (dates as DD MMM YYYY, ₹ amounts) and `lib/password.ts`. The security test passed 14/14. Type-check and lint pass. |
