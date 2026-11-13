@@ -43,10 +43,14 @@ export async function middleware(request: NextRequest) {
 
   if (!user && !isPublic(path)) return redirectTo("/login");
 
-  if (user && (path === "/" || path === "/login")) {
+  if (user) {
     // role lives in app_metadata (set server-side only), so no DB call is needed here
-    const role = (user.app_metadata as { role?: string } | undefined)?.role;
-    return redirectTo(role === "admin" ? "/admin" : "/app");
+    const role = (user.app_metadata as { role?: string } | undefined)?.role === "admin" ? "admin" : "employee";
+    const home = role === "admin" ? "/admin" : "/app";
+    if (path === "/" || path === "/login") return redirectTo(home);
+    // Wrong area → own home (layouts re-check this against the database)
+    if (role === "employee" && (path === "/admin" || path.startsWith("/admin/"))) return redirectTo(home);
+    if (role === "admin" && (path === "/app" || path.startsWith("/app/"))) return redirectTo(home);
   }
 
   return response;

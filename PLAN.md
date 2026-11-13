@@ -332,11 +332,20 @@ employee-portal/
 - Later phases add Attendance / Leave / Payslip history to the detail page
 
 ### Phase 4 — Attendance & Daily Tasks
-- [ ] `clock_in` / `clock_out` RPCs with the rules from §3.3
-- [ ] Employee clock card plus the task modals (plan on clock-in, complete on clock-out)
-- [ ] Employee attendance history and calendar
-- [ ] Admin **Today** board plus a history date picker
-- [ ] Auto-close cron for missed clock-outs, and the admin attendance-fix screen
+- [x] Migration `0004_attendance.sql`:
+  - `clock_in(tasks[])` and `clock_out(done[], extra[], summary)` RPCs. Server time only, Sunday / holiday / full-day-leave blocked, tasks required at clock-in, summary required at clock-out.
+  - `attendance_compute` trigger recalculates late (after 09:00 + grace), half day (under 4 h), early leave (before 17:00) and missed clock-out on every insert or update, so admin corrections recompute too
+  - `day_info()` works out what kind of day it is: working, weekly off, holiday (including moved floating holidays), leave or half-day leave
+  - `team_day(date)` for the admin board, admin only
+  - pg_cron job `close-missed-clock-outs` at 23:59 IST, plus the same cleanup on every clock-in and when the Today board loads
+- [x] Migration `0005_attendance_month.sql`: `employee_month(employee, month)` returns every day of a month (self or admin)
+- [x] Employee dashboard `/app`: clock card in 4 states (off day, ready to clock in, working with a live timer and plan, day complete). The clock-in pop-up has a task-list editor; the clock-out pop-up has a ticklist, extra tasks and a summary. Monthly stat tiles.
+- [x] Employee `/app/attendance`: month calendar (Monday-first, coloured by status, hours per day), day details panel (in/out times, tasks, summary, admin note), previous months
+- [x] Admin `/admin/today`: stat tiles, filter tabs (Working / Clocked out / Away / Not in), search, one card per person (times, plan or completed tasks, summary), date picker for history, refreshes every 60 s on today
+- [x] Admin attendance fix: "Edit times" or "Add attendance" on any card (IST time inputs plus a note the employee can see). Audit logged.
+- [x] Middleware sends people to their own area by role at the HTTP level (proper 307 instead of a browser redirect after the page starts loading)
+- [x] Tests: attendance logic 19/19 and page rendering 13/13, using throwaway employees that were deleted afterwards
+- [ ] The user to check `/admin/today` in the browser (couldn't render it as admin in tests without the admin password)
 
 ### Phase 5 — Holidays
 - [ ] Admin holiday calendar CRUD (company / festival / floating)
@@ -399,3 +408,4 @@ employee-portal/
 | 2026-11-13 | Phase 2 (most of it): connected to the user's Supabase database, applied migrations 0001 + 0002, built login, change-password, logout, middleware, role-guarded layouts, the 404 page and the create-admin script. `/styleguide` now shows only in development. Waiting on the API keys to create the admin and test end to end. Default leave quotas are placeholders for the admin to adjust. |
 | 2026-11-13 | Keys verified. The user created an account in the Supabase dashboard, which was promoted to admin (Rohan Trehan). Note: if an admin's role is changed by hand, update BOTH `profiles.role` and `auth.users.raw_app_meta_data.role`. |
 | 2026-11-13 | Phase 3 built: employee list, add, edit, deactivate, reset password, departments, automatic leave balances (migration 0003), audit logging, plus `lib/format.ts` (dates as DD MMM YYYY, ₹ amounts) and `lib/password.ts`. The security test passed 14/14. Type-check and lint pass. |
+| 2026-11-13 | Phase 4 built: clock in/out with tasks, automatic statuses, nightly pg_cron cleanup, employee dashboard and attendance calendar, admin Today board with attendance fixes (migrations 0004 + 0005). Middleware now enforces the role area. Tests 19/19 + 13/13. Added `summary` and `is_late` columns to attendance (late is now tracked separately from half day). |
