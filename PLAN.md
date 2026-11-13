@@ -374,8 +374,11 @@ employee-portal/
 - [x] Tests: leave rules 24/24, pages and attachments 12/12, with temporary data cleaned up afterwards
 
 ### Phase 7 — Overtime
-- [ ] Employee overtime log form and history
-- [ ] Admin approval queue
+- [x] Migration `0008_overtime.sql`: `log_overtime`, `cancel_overtime` and `review_overtime` (approve / reject / revoke) RPCs
+  - Rules: today or up to 45 days back; 0.25–16 h in quarter hours; description required; one live entry per day; a reason is needed to reject or revoke; audit logged
+- [x] Employee `/app/overtime`: stat tiles (approved this month / pending / approved this year), a "Long days you haven't logged" list built from attendance over 8 h (suggested hours rounded down to 15 min, one-click "Log it"), log pop-up, entries list with cancel for pending ones
+- [x] Admin `/admin/overtime`: month switcher, stat tiles, approval queue showing that day's worked time from attendance, monthly decisions table with Revoke, a per-employee "Totals" card (approved hours feed payroll in Phase 8)
+- [x] Tests: 16/16 with a temporary employee, cleaned up afterwards
 
 ### Phase 8 — Payroll & Payslips
 - [ ] Basic salary field on the employee profile
@@ -427,3 +430,4 @@ employee-portal/
 | 2026-11-13 | Bug fix (reported by the user): pop-ups closed while typing. Cause: `Modal` re-ran its "on open" effect on every render because callers pass an inline `onClose`, which moved focus to the ✕ button, so the next space or Enter closed the pop-up. Fix: keep `onClose` in a ref, run the effect only when `open` changes, and never focus the ✕ button. Affects every pop-up. |
 | 2026-11-13 | Phase 5 built: holiday calendar management, floating-holiday swaps with admin approval (migration 0006), employee holidays page with next-holiday countdown. Tests 18/18. |
 | 2026-11-13 | Phase 6 built: full leave management (migration 0007, storage bucket for documents). No carry forward. Tests 24/24 + 12/12. The upload library on `/app/leaves` now loads only on submit (page JS 78 KB → 8.6 KB). |
+| 2026-11-13 | Phase 7 built: extra hours, with employees logging (plus long-day suggestions from attendance) and admin approval and monthly totals (migration 0008). Tests 16/16. |
