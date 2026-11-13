@@ -23,19 +23,29 @@ export function Modal({
   size?: "sm" | "md" | "lg";
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  // Keep the latest onClose without re-running the open effect. Callers often pass an
+  // inline arrow function, which is new on every render (e.g. on every keystroke).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
+  // Runs only when the modal opens or closes, never while typing inside it.
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCloseRef.current();
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    panelRef.current?.querySelector<HTMLElement>("input, textarea, select, button")?.focus();
+    // Focus the first field (never the ✕ close button), falling back to the panel itself.
+    const panel = panelRef.current;
+    const field = panel?.querySelector<HTMLElement>("[data-autofocus], input:not([type=hidden]), textarea, select");
+    (field ?? panel)?.focus();
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open || typeof document === "undefined") return null;
 
@@ -44,8 +54,9 @@ export function Modal({
       <div className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]" onClick={onClose} aria-hidden />
       <div
         ref={panelRef}
+        tabIndex={-1}
         className={cn(
-          "animate-pop relative flex max-h-[92vh] w-full flex-col rounded-t-[24px] bg-white shadow-pop sm:rounded-card",
+          "animate-pop relative flex max-h-[92vh] w-full flex-col rounded-t-[24px] bg-white shadow-pop outline-none sm:rounded-card",
           { sm: "sm:max-w-md", md: "sm:max-w-lg", lg: "sm:max-w-2xl" }[size],
         )}
       >
@@ -55,6 +66,7 @@ export function Modal({
             {description && <p className="mt-1 text-sm text-body">{description}</p>}
           </div>
           <button
+            type="button"
             onClick={onClose}
             aria-label="Close"
             className="-mr-2 -mt-1 grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-full text-body transition-colors hover:bg-app hover:text-ink"
