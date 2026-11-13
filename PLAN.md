@@ -315,7 +315,8 @@ employee-portal/
 - [x] Login page (reference layout), middleware session refresh and redirects, role layouts (`/admin` admin only, `/app` employee only), logout route, branded 404
 - [x] Forced first-login password change (`/change-password`)
 - [x] `npm run create-admin -- email "Full Name"` script (prints a one-time temporary password)
-- [ ] Create the first admin account ← needs the service-role key and the admin's email
+- [x] First admin account: the user created it in the Supabase dashboard, then it was promoted to admin (Rohan Trehan, RT-001; role set in both `profiles` and `app_metadata`)
+- [x] Logged out, `/`, `/admin` and `/app` redirect to `/login`. The login page renders on narrow screens.
 - [ ] Log in end to end and test that an employee cannot read another employee's data
 
 ### Phase 3 — Admin: Employees
@@ -389,3 +390,4 @@ employee-portal/
 | 2026-11-12 | Phase 0 done (except the Supabase keys): scaffolded Next.js, installed libraries, added the Supabase client helpers, downloaded the logos, and the build passes. |
 | 2026-11-12 | Phase 1 done: design tokens, Plus Jakarta Sans, UI components, route-progress bar, logo loader, app shell (sidebar, top bar, mobile drawer), `/styleguide` page. Moved the Next.js dev badge to the bottom right so it doesn't cover the sidebar. Type-check, lint and build pass. |
 | 2026-11-13 | Phase 2 (most of it): connected to the user's Supabase database, applied migrations 0001 + 0002, built login, change-password, logout, middleware, role-guarded layouts, the 404 page and the create-admin script. `/styleguide` now shows only in development. Waiting on the API keys to create the admin and test end to end. Default leave quotas are placeholders for the admin to adjust. |
+| 2026-11-13 | Keys verified. The user created an account in the Supabase dashboard, which was promoted to admin (Rohan Trehan). Note: if an admin's role is changed by hand, update BOTH `profiles.role` and `auth.users.raw_app_meta_data.role`. |
