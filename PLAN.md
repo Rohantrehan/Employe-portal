@@ -348,9 +348,13 @@ employee-portal/
 - [ ] The user to check `/admin/today` in the browser (couldn't render it as admin in tests without the admin password)
 
 ### Phase 5 — Holidays
-- [ ] Admin holiday calendar CRUD (company / festival / floating)
-- [ ] Employee holiday calendar view
-- [ ] Floating holiday swap request and approval
+- [x] Migration `0006_holidays.sql`: `request_floating_swap`, `cancel_floating_swap` and `review_floating_swap` RPCs; a guard trigger stops a moved floating holiday being re-dated or turned into a non-floating one
+  - A request must be for a floating holiday that hasn't passed. The new day must be a real working day for that employee (not a Sunday, another holiday or leave), in the same year, with no attendance yet. One live request per holiday.
+  - Approve re-checks everything. Reject needs a reason. Both are audit logged.
+- [x] Admin `/admin/holidays`: year switcher, stat tiles, holidays grouped by month (date chip, type badge, "falls on a Sunday" warning), add / edit / delete pop-ups, swap-request queue with approve / reject (with reason) and recent decisions
+- [x] Employee `/app/holidays`: next-holiday hero with countdown (counts moved days), year list, "Move" on upcoming floating holidays (date + optional reason), "My swap requests" with status, admin note and cancel
+- [x] Approved swaps take effect everywhere through `day_info`: the original date becomes a working day (clock-in allowed), the new date shows as "Holiday (moved)" on the clock card, calendar and Today board
+- [x] Tests: 18/18 (rules, permissions, the effect on day type, page rendering) with temporary holidays and employees, cleaned up afterwards
 
 ### Phase 6 — Leave Management
 - [ ] Admin: leave types, yearly policies, per-employee overrides, balance initialisation per year
@@ -410,3 +414,4 @@ employee-portal/
 | 2026-11-13 | Phase 3 built: employee list, add, edit, deactivate, reset password, departments, automatic leave balances (migration 0003), audit logging, plus `lib/format.ts` (dates as DD MMM YYYY, ₹ amounts) and `lib/password.ts`. The security test passed 14/14. Type-check and lint pass. |
 | 2026-11-13 | Phase 4 built: clock in/out with tasks, automatic statuses, nightly pg_cron cleanup, employee dashboard and attendance calendar, admin Today board with attendance fixes (migrations 0004 + 0005). Middleware now enforces the role area. Tests 19/19 + 13/13. Added `summary` and `is_late` columns to attendance (late is now tracked separately from half day). |
 | 2026-11-13 | Bug fix (reported by the user): pop-ups closed while typing. Cause: `Modal` re-ran its "on open" effect on every render because callers pass an inline `onClose`, which moved focus to the ✕ button, so the next space or Enter closed the pop-up. Fix: keep `onClose` in a ref, run the effect only when `open` changes, and never focus the ✕ button. Affects every pop-up. |
+| 2026-11-13 | Phase 5 built: holiday calendar management, floating-holiday swaps with admin approval (migration 0006), employee holidays page with next-holiday countdown. Tests 18/18. |
