@@ -392,9 +392,9 @@ employee-portal/
 - [x] Tests: amount-in-words 11/11; payroll flow and PDF 20/20 (two runs). Sample PDF checked visually.
 
 ### Phase 9 — Dashboards & Graphs
-- [ ] Admin analytics dashboard (§3.9)
-- [ ] Employee personal dashboard (§3.9)
-- [ ] Postgres views / RPCs for chart data, so the browser does not do heavy queries
+- [x] Admin analytics dashboard (§3.9)
+- [x] Employee personal dashboard (§3.9)
+- [x] Postgres views / RPCs for chart data, so the browser does not do heavy queries
 
 ### Phase 10 — Polish, QA & Deploy
 - [ ] Notifications, audit log, CSV export (from §3.10, if wanted)
@@ -437,3 +437,4 @@ employee-portal/
 | 2026-11-13 | Phase 6 built: full leave management (migration 0007, storage bucket for documents). No carry forward. Tests 24/24 + 12/12. The upload library on `/app/leaves` now loads only on submit (page JS 78 KB → 8.6 KB). |
 | 2026-11-13 | Phase 7 built: extra hours, with employees logging (plus long-day suggestions from attendance) and admin approval and monthly totals (migration 0008). Tests 16/16. |
 | 2026-11-13 | Phase 8 built: payroll sheet, publish and paid workflow, branded payslip PDF with the Lucknow footer (as the user asked), employee payslips page (migration 0009; added `@fontsource/plus-jakarta-sans`; `serverExternalPackages: ["@react-pdf/renderer"]`). Fixes: `formatINR` now shows paise when present instead of rounding (₹38,750.50, not ₹38,751); the PDF logo is passed as bytes because a Windows `D:\` path was read as a URL. Tests 20/20. |
+| 2026-11-17 | Phase 9 built: dashboards (migration 0010: `admin_dashboard()`, `my_dashboard()`, `_payroll_by_month()`, each a single jsonb call of about 130 ms). Admin: today tiles (working, not clocked in, on leave, pending approvals), 30-day attendance trend (present, late, on leave), average hours per person against 8h, leave by type and by month, extra hours per month, payroll cost for the last 12 months. Employee: hours for the last 14 days against an 8h target line, leave-balance bars (used, pending, left), month heat-map by hours, next-holiday card. The charts are hand-drawn SVG in `components/charts/` (no chart library; colours are colour-blind-validated; every chart has hover tooltips and a "Show data" table). Tests 30/30, checked visually on desktop and mobile. |
