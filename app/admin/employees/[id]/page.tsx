@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/misc";
 import { requireRole } from "@/lib/auth";
-import { formatDate, formatINR } from "@/lib/format";
+import { formatDate, formatINR, formatPhone } from "@/lib/format";
 import { EditEmployeeForm } from "./edit-employee-form";
 import { AccountActions } from "./account-actions";
 
@@ -61,7 +61,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
             <span className="font-mono">{emp.emp_code}</span>
             {emp.designation && <span>{emp.designation}{dept ? ` · ${dept}` : ""}</span>}
             <span className="inline-flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />{emp.email}</span>
-            {emp.phone && <span className="inline-flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{emp.phone}</span>}
+            {emp.phone && <span className="inline-flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{formatPhone(emp.phone)}</span>}
           </p>
         </div>
       </div>

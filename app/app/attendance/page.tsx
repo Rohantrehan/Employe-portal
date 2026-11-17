@@ -25,7 +25,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   return (
     <>
       <PageHeader eyebrow="My time" title="Attendance" description="Every day of the month with your clock-in times and tasks." />
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatTile label="Present" value={`${worked.length} / ${workingDays}`} sub="Working days so far" tone="success" />
         <StatTile label="Hours" value={formatDuration(totalMins)} sub="Total this month" tone="dark" />
         <StatTile label="Late" value={worked.filter((d) => d.is_late).length} sub="Arrivals after grace time" tone="warning" />

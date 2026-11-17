@@ -92,21 +92,21 @@ export function StatTile({
   className?: string;
 }) {
   return (
-    <div className={cn("card card-hover group relative overflow-hidden p-5", className)}>
+    <div className={cn("card card-hover group relative min-w-0 overflow-hidden p-4 sm:p-5", className)}>
       <span
         className="absolute inset-x-0 top-0 h-[3px] origin-left scale-x-0 bg-brand transition-transform duration-500 group-hover:scale-x-100"
         aria-hidden
       />
       <div className="flex items-start justify-between gap-3">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-body">{label}</p>
+        <p className="text-[10.5px] font-bold uppercase tracking-wider text-body sm:text-[11px]">{label}</p>
         {icon && (
-          <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-full [&_svg]:h-[18px] [&_svg]:w-[18px]", chipTones[tone])}>
+          <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-full sm:h-9 sm:w-9 [&_svg]:h-4 [&_svg]:w-4 sm:[&_svg]:h-[18px] sm:[&_svg]:w-[18px]", chipTones[tone])}>
             {icon}
           </span>
         )}
       </div>
-      <p className="mt-2 text-[30px] font-extrabold leading-none tracking-[-0.03em] text-ink">{value}</p>
-      {sub && <p className="mt-2 text-[13px] text-body">{sub}</p>}
+      <p className="mt-2 text-[24px] font-extrabold leading-none tracking-[-0.03em] text-ink sm:text-[30px]">{value}</p>
+      {sub && <p className="mt-2 text-[12px] text-body sm:text-[13px]">{sub}</p>}
     </div>
   );
 }

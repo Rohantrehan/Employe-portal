@@ -58,7 +58,7 @@ export function EmployeeLeaves({
         </Button>
       </div>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {types.map((t) => (
           <BalanceCard key={t.id} type={t} balance={balances.find((b) => b.leave_type_id === t.id)} requests={requests} year={year} />
         ))}

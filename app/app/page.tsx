@@ -76,7 +76,7 @@ export default async function EmployeeDashboard() {
         {todayRec && <ClockCard today={todayRec} workStart={hhmm(settings?.work_start)} workEnd={hhmm(settings?.work_end)} />}
       </div>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatTile label="Days worked" value={workedDays.length} sub="This month" icon={<CalendarCheck />} tone="success" />
         <StatTile label="Hours this month" value={formatDuration(totalMins)} sub="Closed days only" icon={<Clock3 />} tone="dark" />
         <StatTile

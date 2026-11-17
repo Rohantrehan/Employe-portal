@@ -25,3 +25,10 @@ export function formatINR(value: number | string | null | undefined, opts: { dec
 export function todayIST() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date());
 }
+
+/** "+91 98765 43210" for Indian mobile numbers; other numbers are returned as stored. */
+export function formatPhone(value: string | null | undefined) {
+  if (!value) return "";
+  const m = value.match(/^(?:\+?91)?([6-9]\d{4})(\d{5})$/);
+  return m ? `+91 ${m[1]} ${m[2]}` : value;
+}

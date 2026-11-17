@@ -16,10 +16,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!/^[0-9a-f-]{36}$/i.test(id)) return new NextResponse("Not found", { status: 404 });
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.redirect(new URL("/login", request.url));
+  const { data: auth } = await supabase.auth.getClaims();
+  if (!auth?.claims?.sub) return NextResponse.redirect(new URL("/login", request.url));
 
   const { data: slip } = await supabase
     .from("payslips")

@@ -152,7 +152,7 @@ export function StyleguideDemo() {
       </Section>
 
       <Section title="KPI tiles">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           <StatTile label="Employees" value="24" sub="2 joined this month" icon={<Users />} tone="dark" />
           <StatTile label="Present today" value="19" sub="3 late arrivals" icon={<CalendarCheck />} tone="success" />
           <StatTile label="On leave" value="3" sub="2 sick · 1 vacation" icon={<Plane />} tone="info" />

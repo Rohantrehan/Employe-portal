@@ -19,13 +19,18 @@ export type Profile = {
 
 export const homeFor = (role: Role) => (role === "admin" ? "/admin" : "/app");
 
-/** Current user + profile, cached for the duration of one request. */
+/**
+ * Current user + profile, cached for the duration of one request.
+ * getClaims() verifies the JWT locally against the project's (cached) public signing key,
+ * so there is no round trip to Supabase Auth on every page. Deactivated users are still
+ * caught by the profile check below (is_active), and RLS protects the data itself.
+ */
 export const getSession = cache(async () => {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  const { data } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+  if (!claims?.sub) return null;
+  const user = { id: claims.sub, email: (claims.email as string | undefined) ?? null };
   const { data: profile } = await supabase
     .from("profiles")
     .select("id, role, emp_code, full_name, email, designation, avatar_url, is_active, must_change_password")

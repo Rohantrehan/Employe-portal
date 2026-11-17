@@ -27,9 +27,10 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Verified locally with the project's public signing key (no network call per request).
+  // Also refreshes an expired session and writes the new cookies via setAll above.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims?.sub ? { app_metadata: data.claims.app_metadata } : null;
   const path = request.nextUrl.pathname;
 
   const redirectTo = (to: string) => {
