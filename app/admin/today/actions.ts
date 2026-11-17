@@ -49,3 +49,23 @@ export async function saveAttendance(input: z.input<typeof fixSchema>): Promise<
   revalidatePath("/admin/today");
   return { ok: true };
 }
+
+const reviewSchema = z.object({
+  id: z.string().uuid(),
+  approve: z.boolean(),
+  note: z.string().trim().max(500, "Keep the note under 500 characters"),
+  time: time.or(z.literal("")),
+});
+
+/** Approve (optionally with a corrected time) or reject an employee's missed clock-out request. */
+export async function reviewClockoutFix(input: z.input<typeof reviewSchema>): Promise<FixResult> {
+  const { supabase } = await requireRole("admin");
+  const parsed = reviewSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const v = parsed.data;
+  const { error } = await supabase.rpc("review_clockout_fix", { p_id: v.id, p_approve: v.approve, p_note: v.note, p_time: v.time || null });
+  if (error) return { ok: false, error: error.code === "P0001" ? error.message : "Could not save the review. Please try again." };
+  revalidatePath("/admin", "layout");
+  revalidatePath("/app", "layout");
+  return { ok: true };
+}

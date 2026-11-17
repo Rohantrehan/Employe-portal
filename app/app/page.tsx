@@ -11,6 +11,7 @@ import { formatDate, todayIST } from "@/lib/format";
 import { formatDuration, type DayKind, type DayRecord } from "@/lib/attendance";
 import { daysBetween, monthName, weekday } from "@/lib/holidays";
 import { formatDays, remaining, total, type Balance } from "@/lib/leave";
+import { ClockoutFix, type FixRequest } from "@/components/attendance/clockout-fix";
 import { ClockCard } from "./clock-card";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -32,13 +33,35 @@ export default async function EmployeeDashboard() {
   const year = Number(today.slice(0, 4));
   const monthStart = today.slice(0, 8) + "01";
 
-  const [{ data: month }, { data: settings }, { data: mine }, { data: balances }, { data: types }] = await Promise.all([
+  const since = new Date(Date.parse(today + "T00:00:00Z") - 30 * 86_400_000).toISOString().slice(0, 10);
+  const [{ data: month }, { data: settings }, { data: mine }, { data: balances }, { data: types }, { data: missedRows }, { data: fixReqs }] = await Promise.all([
     supabase.rpc("employee_month", { p_employee: profile.id, p_month: monthStart }),
     supabase.from("settings").select("work_start, work_end").single(),
     supabase.rpc("my_dashboard", { p_days: 14 }),
     supabase.from("leave_balances").select("leave_type_id, allotted, carried, used, pending").eq("employee_id", profile.id).eq("year", year),
     supabase.from("leave_types").select("id, name, tracks_balance, is_active, sort_order").eq("is_active", true).eq("tracks_balance", true).order("sort_order"),
+    supabase
+      .from("attendance")
+      .select("id, work_date, clock_in, attendance_tasks(id, title, planned, done, sort_order)")
+      .eq("employee_id", profile.id)
+      .eq("status", "missed_clock_out")
+      .is("clock_out", null)
+      .gte("work_date", since)
+      .order("work_date", { ascending: false }),
+    supabase
+      .from("clockout_fix_requests")
+      .select("id, attendance_id, status, clock_out, review_note")
+      .eq("employee_id", profile.id)
+      .gte("work_date", since)
+      .order("created_at", { ascending: false }),
   ]);
+  const missed = (missedRows ?? []).map((a) => ({
+    attendance_id: a.id as string,
+    day: a.work_date as string,
+    clock_in: a.clock_in as string,
+    tasks: [...((a.attendance_tasks ?? []) as { id: string; title: string; planned: boolean; done: boolean; sort_order: number }[])].sort((x, y) => x.sort_order - y.sort_order),
+  }));
+  const requests = (fixReqs ?? []) as FixRequest[];
 
   const days = (month ?? []) as (DayRecord & { day: string })[];
   const todayRec = days.find((d) => d.day === today);
@@ -72,7 +95,21 @@ export default async function EmployeeDashboard() {
         description="Plan your day, clock in and keep track of your time."
       />
 
-      <div className="mt-8">
+      {missed.length > 0 && (
+        <section className="card mt-8 p-5 sm:p-6" aria-label="Missed clock-outs">
+          <h2 className="text-base font-bold tracking-[-0.01em] text-ink">
+            {missed.length === 1 ? "1 day without a clock-out" : `${missed.length} days without a clock-out`}
+          </h2>
+          <p className="mt-0.5 text-sm text-body">Those hours don&apos;t count until it&apos;s fixed. Send your leaving time to your admin.</p>
+          <div className="mt-4 space-y-2.5">
+            {missed.map((d) => (
+              <ClockoutFix key={d.attendance_id} day={d} compact request={requests.find((r) => r.attendance_id === d.attendance_id)} workEnd={hhmm(settings?.work_end)} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <div className={missed.length ? "mt-6" : "mt-8"}>
         {todayRec && <ClockCard today={todayRec} workStart={hhmm(settings?.work_start)} workEnd={hhmm(settings?.work_end)} />}
       </div>
 

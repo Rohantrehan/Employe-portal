@@ -30,7 +30,20 @@ function shiftMonth(month: string, by: number) {
 }
 
 /** Month calendar with a details panel for the selected day. */
-export function MonthView({ days, month, today, hrefFor }: { days: MonthDay[]; month: string; today: string; hrefFor: (month: string) => string }) {
+export function MonthView({
+  days,
+  month,
+  today,
+  hrefFor,
+  renderExtra,
+}: {
+  days: MonthDay[];
+  month: string;
+  today: string;
+  hrefFor: (month: string) => string;
+  /** Extra content under the selected day's times (e.g. the missed clock-out fix). */
+  renderExtra?: (d: MonthDay) => React.ReactNode;
+}) {
   const initial = days.find((d) => d.day === today)?.day ?? [...days].reverse().find((d) => d.clock_in)?.day ?? days[0]?.day;
   const [selected, setSelected] = useState(initial);
   const sel = days.find((d) => d.day === selected);
@@ -106,13 +119,13 @@ export function MonthView({ days, month, today, hrefFor }: { days: MonthDay[]; m
       </Card>
 
       <Card className="h-fit p-6">
-        {sel ? <DayDetails d={sel} isToday={sel.day === today} future={sel.day > today} /> : <p className="text-sm text-body">Pick a day.</p>}
+        {sel ? <DayDetails d={sel} isToday={sel.day === today} future={sel.day > today} extra={renderExtra?.(sel)} /> : <p className="text-sm text-body">Pick a day.</p>}
       </Card>
     </div>
   );
 }
 
-function DayDetails({ d, isToday, future }: { d: MonthDay; isToday: boolean; future: boolean }) {
+function DayDetails({ d, isToday, future, extra }: { d: MonthDay; isToday: boolean; future: boolean; extra?: React.ReactNode }) {
   const b = dayBadge(d, isToday);
   return (
     <div>
@@ -139,6 +152,7 @@ function DayDetails({ d, isToday, future }: { d: MonthDay; isToday: boolean; fut
               </div>
             ))}
           </dl>
+          {extra && <div className="mt-4">{extra}</div>}
           <p className="mt-5 text-[11px] font-bold uppercase tracking-wider text-body">Tasks</p>
           <TaskChecklist tasks={d.tasks} showStatus={!!d.clock_out} className="mt-2" />
           {d.summary && (

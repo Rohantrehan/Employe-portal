@@ -33,7 +33,11 @@ const sum = (xs: number[]) => xs.reduce((a, b) => a + Number(b), 0);
 
 export default async function AdminDashboard() {
   const { supabase, profile } = await requireRole("admin");
-  const { data, error } = await supabase.rpc("admin_dashboard");
+  const [{ data, error }, { count: fixCount }] = await Promise.all([
+    supabase.rpc("admin_dashboard"),
+    supabase.from("clockout_fix_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+  ]);
+  const fixes = fixCount ?? 0;
   const d = data as Dashboard | null;
 
   if (error || !d) {
@@ -47,7 +51,7 @@ export default async function AdminDashboard() {
 
   const k = d.kpis;
   const currentMonth = Number(d.today.slice(5, 7));
-  const pendingTotal = d.pending.leaves + d.pending.overtime + d.pending.swaps;
+  const pendingTotal = d.pending.leaves + d.pending.overtime + d.pending.swaps + fixes;
   const expectedToday = k.headcount - k.off_today - k.on_leave;
 
   // Trend: skip days nobody was expected (Sundays, company holidays).
@@ -92,11 +96,11 @@ export default async function AdminDashboard() {
         <Link href="/admin/leaves" className="block">
           <StatTile label="On leave today" value={k.on_leave} sub={k.off_today ? `${k.off_today} off / holiday` : "Approved leave"} icon={<Palmtree />} tone="info" />
         </Link>
-        <Link href={d.pending.leaves ? "/admin/leaves" : d.pending.overtime ? "/admin/overtime" : "/admin/holidays"} className="block">
+        <Link href={fixes ? "/admin/today" : d.pending.leaves ? "/admin/leaves" : d.pending.overtime ? "/admin/overtime" : "/admin/holidays"} className="block">
           <StatTile
             label="Waiting for you"
             value={pendingTotal}
-            sub={`${d.pending.leaves} leave · ${d.pending.overtime} extra hours · ${d.pending.swaps} swaps`}
+            sub={`${d.pending.leaves} leave · ${d.pending.overtime} extra hours · ${d.pending.swaps} swaps${fixes ? ` · ${fixes} clock-out` : ""}`}
             icon={<ClipboardCheck />}
             tone={pendingTotal ? "brand" : "dark"}
           />

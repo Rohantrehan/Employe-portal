@@ -6,6 +6,7 @@ import { formatDate, todayIST } from "@/lib/format";
 import type { DayRecord } from "@/lib/attendance";
 import { TodayBoard } from "./today-board";
 import { DatePicker } from "./date-picker";
+import { FixRequests, type PendingFix } from "./fix-requests";
 
 export const metadata: Metadata = { title: "Today" };
 
@@ -25,7 +26,17 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const date = d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= today ? d : today;
 
   await supabase.rpc("close_missed_clock_outs");
-  const { data, error } = await supabase.rpc("team_day", { p_date: date });
+  const [{ data, error }, { data: fixRows }] = await Promise.all([
+    supabase.rpc("team_day", { p_date: date }),
+    supabase
+      .from("clockout_fix_requests")
+      .select(
+        "id, work_date, clock_out, summary, reason, done_task_ids, created_at, employee:profiles!clockout_fix_requests_employee_id_fkey(full_name, emp_code, avatar_url), attendance(clock_in, tasks:attendance_tasks(id, title, planned))",
+      )
+      .eq("status", "pending")
+      .order("work_date"),
+  ]);
+  const fixes = (fixRows ?? []) as unknown as PendingFix[];
   const rows = (data ?? []) as TeamRow[];
 
   const isToday = date === today;
@@ -54,6 +65,8 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         <StatTile label={isToday ? "Not clocked in" : "Absent"} value={notIn} icon={<UserX />} tone="brand" />
         <StatTile label="Late" value={late} icon={<TimerReset />} tone="warning" className="col-span-2 lg:col-span-1" />
       </div>
+
+      <FixRequests items={fixes} />
 
       <div className="mt-6">
         <TodayBoard rows={rows} date={date} isToday={isToday} weeklyOff={weeklyOff} />

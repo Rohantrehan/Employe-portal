@@ -18,7 +18,7 @@ export async function clockInAction(tasks: string[]): Promise<SimpleResult> {
   if (!clean.length) return { ok: false, error: "Write at least one task you plan to do today." };
   const { error } = await supabase.rpc("clock_in", { p_tasks: clean });
   if (error) return { ok: false, error: dbMessage(error) };
-  revalidatePath("/app");
+  revalidatePath("/app", "layout");
   revalidatePath("/app/attendance");
   return { ok: true };
 }
@@ -33,7 +33,7 @@ export async function clockOutAction(input: { done: string[]; extra: string[]; s
     p_summary: summary,
   });
   if (error) return { ok: false, error: dbMessage(error) };
-  revalidatePath("/app");
+  revalidatePath("/app", "layout");
   revalidatePath("/app/attendance");
   return { ok: true };
 }

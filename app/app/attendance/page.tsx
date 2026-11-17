@@ -5,6 +5,12 @@ import { todayIST } from "@/lib/format";
 import { formatDuration } from "@/lib/attendance";
 import { AttendanceMonth } from "./attendance-month";
 import type { MonthDay } from "@/components/attendance/month-view";
+import type { FixRequest } from "@/components/attendance/clockout-fix";
+
+const nextMonth = (m: string) => {
+  const [y, mo] = m.split("-").map(Number);
+  return mo === 12 ? `${y + 1}-01-01` : `${y}-${String(mo + 1).padStart(2, "0")}-01`;
+};
 
 export const metadata: Metadata = { title: "Attendance" };
 
@@ -14,7 +20,19 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   const { month: m } = await searchParams;
   const month = m && /^\d{4}-(0[1-9]|1[0-2])$/.test(m) && m <= today.slice(0, 7) ? m : today.slice(0, 7);
 
-  const { data } = await supabase.rpc("employee_month", { p_employee: profile.id, p_month: `${month}-01` });
+  const [{ data }, { data: reqs }, { data: settings }] = await Promise.all([
+    supabase.rpc("employee_month", { p_employee: profile.id, p_month: `${month}-01` }),
+    supabase
+      .from("clockout_fix_requests")
+      .select("id, attendance_id, status, clock_out, review_note")
+      .eq("employee_id", profile.id)
+      .gte("work_date", `${month}-01`)
+      .lt("work_date", nextMonth(month))
+      .order("created_at", { ascending: false }),
+    supabase.from("settings").select("work_end").single(),
+  ]);
+  // newest request per day first, so .find() picks the latest
+  const requests = (reqs ?? []) as FixRequest[];
   const days = (data ?? []) as MonthDay[];
   const past = days.filter((d) => d.day <= today);
   const worked = past.filter((d) => d.clock_in);
@@ -32,7 +50,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
         <StatTile label="Absent" value={absent} sub="Working days with no clock-in" tone="brand" />
       </div>
       <div className="mt-6">
-        <AttendanceMonth days={days} month={month} today={today} />
+        <AttendanceMonth days={days} month={month} today={today} requests={requests} workEnd={String(settings?.work_end ?? "17:00").slice(0, 5)} />
       </div>
     </>
   );
