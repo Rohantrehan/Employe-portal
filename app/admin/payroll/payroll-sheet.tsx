@@ -24,6 +24,7 @@ export type PayrollRow = {
   designation: string | null;
   avatar: string | null;
   isActive: boolean;
+  leftOn: string | null;
   profileBasic: number;
   workingDays: number;
   presentDays: number;
@@ -168,7 +169,11 @@ export function PayrollSheet({ rows, month, today, isCurrentMonth }: { rows: Pay
                           </Link>
                           <p className="truncate text-xs text-body">
                             {r.empCode}
-                            {!r.isActive && " · deactivated"}
+                            {r.leftOn ? (
+                              <span className="font-semibold text-brand"> · final month, last day {formatDate(r.leftOn).slice(0, 6)}</span>
+                            ) : (
+                              !r.isActive && " · deactivated"
+                            )}
                           </p>
                         </div>
                       </div>

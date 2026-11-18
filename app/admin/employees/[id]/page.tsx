@@ -6,9 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/misc";
 import { requireRole } from "@/lib/auth";
-import { formatDate, formatINR, formatPhone } from "@/lib/format";
+import { formatDate, formatINR, formatPhone, todayIST } from "@/lib/format";
 import { EditEmployeeForm } from "./edit-employee-form";
 import { AccountActions } from "./account-actions";
+import { ExitPanel, type AdminLetter, type ExitInfo, type FinalPayslip, type LetterEvent } from "./exit-panel";
 
 export const metadata: Metadata = { title: "Employee" };
 
@@ -17,10 +18,10 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const { supabase, profile: me } = await requireRole("admin");
 
-  const [{ data: emp }, { data: departments }, { data: balances }] = await Promise.all([
+  const [{ data: emp }, { data: departments }, { data: balances }, { data: exit }, { data: letters }, { data: events }, { data: settings }, { count: signatures }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, emp_code, full_name, email, phone, designation, department_id, date_of_joining, basic_salary, role, is_active, must_change_password, avatar_url, created_at, departments(name)")
+      .select("id, emp_code, full_name, email, phone, designation, department_id, date_of_joining, basic_salary, role, is_active, must_change_password, avatar_url, created_at, left_on, former_access, departments(name)")
       .eq("id", id)
       .maybeSingle(),
     supabase.from("departments").select("id, name").order("name"),
@@ -29,10 +30,36 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
       .select("allotted, carried, used, pending, year, leave_types(name, color, sort_order)")
       .eq("employee_id", id)
       .eq("year", new Date().getFullYear()),
+    supabase.from("employee_exits").select("last_day, reason, conduct, letters_allowed, note").eq("employee_id", id).maybeSingle(),
+    supabase
+      .from("letters")
+      .select("id, kind, status, ref_no, issue_date, designation, department, date_from, date_to, conduct, pronoun, body, verify_code, cancelled_at, cancel_reason, created_at")
+      .eq("employee_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("letter_events")
+      .select("letter_id, event, created_at, actor:profiles!letter_events_actor_id_fkey(full_name), letters!inner(employee_id)")
+      .eq("letters.employee_id", id)
+      .order("created_at", { ascending: false })
+      .limit(300),
+    supabase.from("settings").select("company_name, letter_experience_template, letter_relieving_template").single(),
+    supabase.from("letter_signatures").select("id", { count: "exact", head: true }).is("retired_at", null),
   ]);
   if (!emp) notFound();
 
   const isMe = emp.id === me.id;
+  const today = todayIST();
+  const exitMonth = exit ? exit.last_day.slice(0, 7) + "-01" : null;
+  const { data: finalSlip } = exitMonth
+    ? await supabase.from("payslips").select("status, payment_status").eq("employee_id", id).eq("month", exitMonth).maybeSingle()
+    : { data: null };
+  const finalPayslip: FinalPayslip | null = exitMonth ? { month: exitMonth, status: finalSlip?.status ?? null, payment_status: finalSlip?.payment_status ?? null } : null;
+  const letterEvents: LetterEvent[] = (events ?? []).map((e) => ({
+    letter_id: e.letter_id,
+    event: e.event as LetterEvent["event"],
+    created_at: e.created_at,
+    actor: (e.actor as unknown as { full_name: string } | null)?.full_name ?? null,
+  }));
   const dept = (emp.departments as unknown as { name: string } | null)?.name;
   const sortedBalances = (balances ?? [])
     .map((b) => ({ ...b, type: b.leave_types as unknown as { name: string; color: string; sort_order: number } }))
@@ -53,7 +80,15 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-[28px] font-extrabold leading-tight tracking-[-0.03em] text-ink">{emp.full_name}</h1>
-            {emp.is_active ? <Badge tone="success" dot>Active</Badge> : <Badge>Deactivated</Badge>}
+            {emp.left_on && emp.left_on < today ? (
+              <Badge>Left {formatDate(emp.left_on)}</Badge>
+            ) : emp.left_on ? (
+              <Badge tone="warning" dot>Leaving {formatDate(emp.left_on)}</Badge>
+            ) : emp.is_active ? (
+              <Badge tone="success" dot>Active</Badge>
+            ) : (
+              <Badge>Deactivated</Badge>
+            )}
             {emp.role === "admin" && <Badge tone="dark">Admin</Badge>}
             {emp.must_change_password && emp.is_active && <Badge tone="warning">Hasn&apos;t set password yet</Badge>}
           </div>
@@ -67,6 +102,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0 space-y-6">
         <EditEmployeeForm
           id={emp.id}
           isMe={isMe}
@@ -83,6 +119,30 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
             role: emp.role,
           }}
         />
+        <div id="exit">
+          <ExitPanel
+            employee={{
+              id: emp.id,
+              full_name: emp.full_name,
+              emp_code: emp.emp_code,
+              designation: emp.designation,
+              department: dept ?? null,
+              date_of_joining: emp.date_of_joining,
+              role: emp.role,
+              left_on: emp.left_on,
+              former_access: emp.former_access,
+            }}
+            exit={(exit as ExitInfo | null) ?? null}
+            letters={(letters ?? []) as AdminLetter[]}
+            events={letterEvents}
+            templates={{ experience: settings?.letter_experience_template ?? "", relieving: settings?.letter_relieving_template ?? "" }}
+            company={settings?.company_name ?? "RohTre Media"}
+            hasSignature={(signatures ?? 0) > 0}
+            finalPayslip={finalPayslip}
+            today={today}
+          />
+        </div>
+        </div>
 
         <div className="space-y-6">
           <Card>
@@ -128,7 +188,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
             </CardBody>
           </Card>
 
-          <AccountActions id={emp.id} name={emp.full_name} isActive={emp.is_active} isMe={isMe} />
+          <AccountActions id={emp.id} name={emp.full_name} isActive={emp.is_active} isMe={isMe} hasExit={!!exit} formerAccess={emp.former_access} />
         </div>
       </div>
     </>

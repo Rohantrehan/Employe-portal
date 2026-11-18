@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabaseConfigured } from "@/lib/supabase/env";
 
-const PUBLIC_PATHS = ["/login", "/auth", "/styleguide"];
+const PUBLIC_PATHS = ["/login", "/auth", "/styleguide", "/verify"];
 const isPublic = (path: string) => PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + "/"));
 
 /**
@@ -51,7 +51,7 @@ export async function middleware(request: NextRequest) {
     if (path === "/" || path === "/login") return redirectTo(home);
     // Wrong area → own home (layouts re-check this against the database)
     if (role === "employee" && (path === "/admin" || path.startsWith("/admin/"))) return redirectTo(home);
-    if (role === "admin" && (path === "/app" || path.startsWith("/app/"))) return redirectTo(home);
+    if (role === "admin" && (path === "/app" || path.startsWith("/app/") || path === "/former")) return redirectTo(home);
   }
 
   return response;

@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { homeFor, type Role } from "@/lib/auth";
+import { homeFor, isFormer, type Role } from "@/lib/auth";
 
 export type FormState = { error?: string; fieldErrors?: Record<string, string> } | undefined;
 
@@ -30,9 +30,16 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, is_active, must_change_password")
+    .select("role, is_active, must_change_password, left_on, former_access")
     .eq("id", data.user.id)
-    .single<{ role: Role; is_active: boolean; must_change_password: boolean }>();
+    .single<{ role: Role; is_active: boolean; must_change_password: boolean; left_on: string | null; former_access: boolean }>();
+
+  // People who have left can still log in to download their letters and payslips, if the admin allows it.
+  if (profile && isFormer(profile)) {
+    if (profile.former_access) redirect(profile.must_change_password ? "/change-password" : "/former");
+    await supabase.auth.signOut();
+    return { error: "This account has been deactivated. Please contact your admin." };
+  }
 
   if (!profile || !profile.is_active) {
     await supabase.auth.signOut();

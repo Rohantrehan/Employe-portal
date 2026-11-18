@@ -7,7 +7,7 @@ import { LogOut, Menu, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Wordmark } from "@/components/ui/logo";
 import { Avatar } from "@/components/ui/misc";
-import { NAV, isActive, type Area } from "./nav";
+import { AREA_HOME, AREA_LABEL, NAV, isActive, type Area } from "./nav";
 
 export type ShellUser = { name: string; email: string; avatarUrl?: string | null; subtitle?: string };
 
@@ -19,13 +19,13 @@ function Sidebar({ area, user, onNavigate }: { area: Area; user: ShellUser; onNa
       <div className="pointer-events-none absolute -left-24 -top-24 h-64 w-64 rounded-full bg-brand/20 blur-3xl" aria-hidden />
 
       <div className="relative flex h-16 items-center px-6">
-        <Link href={area === "admin" ? "/admin" : "/app"} onClick={onNavigate} aria-label="Home">
+        <Link href={AREA_HOME[area]} onClick={onNavigate} aria-label="Home">
           <Wordmark tone="white" height={24} />
         </Link>
       </div>
       <div className="relative px-6 pb-2">
         <span className="inline-flex rounded-full bg-white/[0.06] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/70">
-          {area === "admin" ? "Admin panel" : "Employee portal"}
+          {AREA_LABEL[area]}
         </span>
       </div>
 

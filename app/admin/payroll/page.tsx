@@ -27,6 +27,8 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
     designation: (r.designation as string | null) ?? null,
     avatar: (r.avatar_url as string | null) ?? null,
     isActive: r.is_active as boolean,
+    // Marked only in the month they leave (their final payslip).
+    leftOn: typeof r.left_on === "string" && r.left_on.startsWith(month) ? r.left_on : null,
     profileBasic: Number(r.profile_basic ?? 0),
     workingDays: Number(r.working_days ?? 0),
     presentDays: Number(r.present_days ?? 0),

@@ -1,32 +1,8 @@
 import "server-only";
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { Document, Font, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { formatDate } from "@/lib/format";
 import { amountInWords, formatRs, monthTitle } from "@/lib/payroll";
-
-// Brand font (Plus Jakarta Sans). It has no ₹ glyph, so amounts use "Rs.".
-const fontDir = path.join(process.cwd(), "node_modules", "@fontsource", "plus-jakarta-sans", "files");
-Font.register({
-  family: "Jakarta",
-  fonts: [
-    { src: path.join(fontDir, "plus-jakarta-sans-latin-400-normal.woff"), fontWeight: 400 },
-    { src: path.join(fontDir, "plus-jakarta-sans-latin-600-normal.woff"), fontWeight: 600 },
-    { src: path.join(fontDir, "plus-jakarta-sans-latin-700-normal.woff"), fontWeight: 700 },
-    { src: path.join(fontDir, "plus-jakarta-sans-latin-800-normal.woff"), fontWeight: 800 },
-  ],
-});
-Font.registerHyphenationCallback((word) => [word]);
-
-// Pass the logo as bytes: a Windows path like "D:\..." is mistaken for a URL scheme and silently fails.
-const LOGO = { data: readFileSync(path.join(process.cwd(), "public", "logos", "rohtre-wordmark-black.png")), format: "png" as const };
-
-const BRAND = "#d4000f";
-const INK = "#111827";
-const BODY = "#6b7280";
-const LINE = "#e5e7eb";
-const SOFT = "#fafafb";
-const TINT = "#fbe6e7";
+import { BODY, BRAND, INK, LINE, LOGO, SOFT, TINT } from "./brand";
 
 const s = StyleSheet.create({
   page: { fontFamily: "Jakarta", fontSize: 9.5, color: INK, paddingTop: 0, paddingBottom: 56, paddingHorizontal: 0 },

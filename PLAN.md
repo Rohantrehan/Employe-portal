@@ -404,6 +404,29 @@ employee-portal/
 - [x] Speed: local JWT check (`getClaims`), loading skeletons, client router cache, `vercel.json` region `sin1` (next to the database)
 - [ ] Deploy (Vercel recommended), add production env vars, create the real admin account
 
+### Phase 11 — Exit, Experience & Relieving Letters
+- [x] Migration `0015_exit_letters.sql`:
+  - `employee_exits` (admin-only; last day, reason, conduct, experience letter allowed, private note)
+  - `profiles.left_on` and `former_access`
+  - `letter_signatures`: versioned and never overwritten
+  - `letters`: draft → issued → cancelled, frozen text, reference number, QR code
+  - `letter_events`: download log
+  - private `letter-assets` bucket (admin only)
+  - nightly `process-exits` job, which also runs on clock-in and on Today
+- [x] Exit: "Mark as leaving" on the employee page. The person works normally until the last day. After it they lose all access, or keep a documents-only login (`/former`) if the admin allows it.
+- [x] Letters: prepare (fields plus editable text from the template), preview the PDF with a DRAFT watermark, then issue.
+  - Issuing is only possible from the last working day and with a signature on file.
+  - An issued letter gets a reference number (RT/EXP/2026/001, RT/REL/…), the current signature and a live QR code.
+  - Cancelling needs a reason; numbers are never reused.
+- [x] QR check page `/verify/[code]` (public): genuine, cancelled or not found. Drafts are never shown.
+- [x] Download log: every download, view and QR check, with a history pop-up and counts.
+- [x] Settings → Letters & signature:
+  - signer name and title; draw or upload the signature; optional seal
+  - signature history ("used on N letters")
+  - wording templates with placeholders; reference prefix
+- [x] Final payslip reminder: status on the exit card, a toast when recording the exit, and a "final month" marker in Payroll. Payroll includes the person in their last month and drops them after it.
+- [x] Tests: 66/66, plus the regression suites
+
 ---
 
 ## 7. Decisions & Open Questions
@@ -442,3 +465,4 @@ employee-portal/
 | 2026-11-17 | Phase 9 built: dashboards (migration 0010: `admin_dashboard()`, `my_dashboard()`, `_payroll_by_month()`, each a single jsonb call of about 130 ms). Admin: today tiles (working, not clocked in, on leave, pending approvals), 30-day attendance trend (present, late, on leave), average hours per person against 8h, leave by type and by month, extra hours per month, payroll cost for the last 12 months. Employee: hours for the last 14 days against an 8h target line, leave-balance bars (used, pending, left), month heat-map by hours, next-holiday card. The charts are hand-drawn SVG in `components/charts/` (no chart library; colours are colour-blind-validated; every chart has hover tooltips and a "Show data" table). Tests 30/30, checked visually on desktop and mobile. |
 | 2026-11-17 | Phase 10 (polish and speed): pages went from 677 ms to 344 ms on average (measured from India; most of the rest is the round trip to the Singapore database, which hosting in `sin1` removes). Changes: `getClaims()` instead of `getUser()` in the middleware, `lib/auth` and the PDF route, so there is no Auth API call per request (ES256 keys, verified locally; deactivated users are still caught by the `is_active` profile check); `loading.tsx` skeletons and `error.tsx` boundaries for both areas; `staleTimes` 15 s; `poweredByHeader: false`. Migration 0011: RLS uses `(select auth.uid())` / `(select is_admin())`, admin FOR ALL policies split into insert/update/delete, 8 FK/lookup indexes. New: Profile page (details, phone edit through `update_my_phone`, password change that checks the current password) and admin Settings page (company name, office hours, grace period, half-day threshold through `save_settings`, migrations 0012 + 0013). The Settings link was a 404 before this. Mobile: KPI tiles are two per row; phone numbers show as +91 98765 43210. Tests: new 27/27; all earlier suites re-run and passing (166 checks). |
 | 2026-11-17 | Missed clock-out handling (the user asked for both): (1) **Reminder banner** on every employee page when they are still clocked in 15 minutes after closing time (re-checked every 30 s; "Later" snoozes it for 30 minutes). (2) **"Forgot to clock out?" requests** (migration 0014: `clockout_fix_requests`, `request_clockout_fix`, `cancel_clockout_fix`, `review_clockout_fix`). The employee sends the time they left, the tasks they finished, a summary and a reason, from the dashboard notice or the attendance calendar, within 30 days, one pending request per day. The admin reviews it on the Today board, can correct the time when approving, and must write a note to reject. Approving writes the clock-out, ticks the tasks, and the trigger recomputes hours and status. The admin dashboard's "Waiting for you" count now includes these requests. Clock in/out now revalidates the whole `/app` layout. Tests: 30/30 new, regression suites passing. |
+| 2026-11-18 | Phase 11 built (the user asked for: experience letter only after leaving, admin signature that can be changed, QR check, cancel letter, relieving letter, final payslip reminder, download log). Migration 0015. Changes to existing behaviour: `is_active_user()` is false after the last day, even before the nightly job runs; `requireRole` sends people who have left to `/former`; login lets former employees into `/former` only; `payroll_month` now returns `left_on`; PDF fonts moved to `lib/pdf/brand.ts`; added the `qrcode` package; server-action body limit raised to 3 MB for image uploads; the employee list's "Deactivated" tab is now "Left / off". Tests: 66/66 new; fix 30, polish 27, rls 14, pages 13, attendance 19, payroll 20 passing (the dash suite is pinned to 2026-11-17 and fails only its date-check line). |

@@ -10,7 +10,21 @@ import { Modal } from "@/components/ui/modal";
 import { resetEmployeePassword, setEmployeeActive } from "../actions";
 import { CredentialsPanel } from "../credentials-panel";
 
-export function AccountActions({ id, name, isActive, isMe }: { id: string; name: string; isActive: boolean; isMe: boolean }) {
+export function AccountActions({
+  id,
+  name,
+  isActive,
+  isMe,
+  hasExit = false,
+  formerAccess = false,
+}: {
+  id: string;
+  name: string;
+  isActive: boolean;
+  isMe: boolean;
+  hasExit?: boolean;
+  formerAccess?: boolean;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [dialog, setDialog] = useState<null | "reset" | "deactivate">(null);
@@ -53,10 +67,12 @@ export function AccountActions({ id, name, isActive, isMe }: { id: string; name:
     <Card>
       <CardHeader title="Account" description="Login access for this person." />
       <CardBody className="space-y-2.5">
-        <Button variant="secondary" block onClick={() => setDialog("reset")} disabled={!isActive}>
+        <Button variant="secondary" block onClick={() => setDialog("reset")} disabled={!isActive && !(hasExit && formerAccess)}>
           <KeyRound className="h-4 w-4" /> Reset password
         </Button>
-        {isActive ? (
+        {hasExit ? (
+          <p className="pt-1 text-[13px] text-body">Login after leaving is managed under Exit &amp; letters.</p>
+        ) : isActive ? (
           <Button variant="danger" block onClick={() => setDialog("deactivate")}>
             <UserX className="h-4 w-4" /> Deactivate
           </Button>
@@ -65,7 +81,7 @@ export function AccountActions({ id, name, isActive, isMe }: { id: string; name:
             <ShieldCheck className="h-4 w-4" /> Re-activate
           </Button>
         )}
-        {!isActive && <p className="pt-1 text-[13px] text-body">Deactivated people can&apos;t log in. Their history is kept.</p>}
+        {!isActive && !hasExit && <p className="pt-1 text-[13px] text-body">Deactivated people can&apos;t log in. Their history is kept.</p>}
       </CardBody>
 
       <Modal

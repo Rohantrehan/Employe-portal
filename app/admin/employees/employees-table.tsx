@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, EmptyState } from "@/components/ui/misc";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { Tabs } from "@/components/ui/tabs";
-import { formatDate } from "@/lib/format";
+import { formatDate, todayIST } from "@/lib/format";
 import type { Department } from "./employee-fields";
 
 export type EmployeeRow = {
@@ -20,6 +20,7 @@ export type EmployeeRow = {
   designation: string | null;
   role: "admin" | "employee";
   is_active: boolean;
+  left_on: string | null;
   date_of_joining: string | null;
   avatar_url: string | null;
   department_id: string | null;
@@ -61,7 +62,7 @@ export function EmployeesTable({ employees, departments }: { employees: Employee
           onChange={setStatus}
           items={[
             { value: "active", label: "Active", count: counts.active },
-            { value: "inactive", label: "Deactivated", count: counts.inactive },
+            { value: "inactive", label: "Left / off", count: counts.inactive },
             { value: "all", label: "All", count: counts.all },
           ]}
         />
@@ -134,7 +135,7 @@ export function EmployeesTable({ employees, departments }: { employees: Employee
                     <TD className="whitespace-nowrap text-body">{formatDate(e.date_of_joining)}</TD>
                     <TD>
                       <div className="flex flex-wrap gap-1.5">
-                        {e.is_active ? <Badge tone="success" dot>Active</Badge> : <Badge tone="neutral">Deactivated</Badge>}
+                        <StatusBadge e={e} />
                         {e.role === "admin" && <Badge tone="dark">Admin</Badge>}
                       </div>
                     </TD>
@@ -161,7 +162,7 @@ export function EmployeesTable({ employees, departments }: { employees: Employee
                       {e.emp_code} · {e.designation ?? e.department ?? e.email}
                     </p>
                   </div>
-                  {e.is_active ? (e.role === "admin" ? <Badge tone="dark">Admin</Badge> : <Badge tone="success" dot>Active</Badge>) : <Badge>Off</Badge>}
+                  {e.is_active && e.role === "admin" ? <Badge tone="dark">Admin</Badge> : <StatusBadge e={e} short />}
                 </Link>
               </li>
             ))}
@@ -170,4 +171,10 @@ export function EmployeesTable({ employees, departments }: { employees: Employee
       )}
     </Card>
   );
+}
+
+function StatusBadge({ e, short }: { e: EmployeeRow; short?: boolean }) {
+  if (e.left_on && e.left_on < todayIST()) return <Badge>{short ? "Left" : `Left ${formatDate(e.left_on)}`}</Badge>;
+  if (e.left_on) return <Badge tone="warning" dot>{short ? "Leaving" : `Leaving ${formatDate(e.left_on)}`}</Badge>;
+  return e.is_active ? <Badge tone="success" dot>Active</Badge> : <Badge>{short ? "Off" : "Deactivated"}</Badge>;
 }
