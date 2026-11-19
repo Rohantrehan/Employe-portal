@@ -61,7 +61,7 @@ export function SettingsForm({ initial }: { initial: Settings }) {
               value={v.grace_minutes}
               onChange={set("grace_minutes")}
               required
-              hint={`Clock-in after ${lateAfter} is marked late.`}
+              hint={`Clock-in after ${lateAfter} is marked late, unless they still work the full ${Math.floor(dayMins / 60)}h${dayMins % 60 ? ` ${dayMins % 60}m` : ""}.`}
             />
             <Input
               label="Half-day below (hours)"

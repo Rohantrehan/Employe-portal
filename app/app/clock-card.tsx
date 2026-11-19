@@ -18,7 +18,7 @@ export function ClockCard({ today, workStart, workEnd }: { today: DayRecord; wor
   const off = !today.clock_in && (today.day_kind === "weekly_off" || today.day_kind === "holiday" || today.day_kind === "leave");
   if (off) return <OffDayCard today={today} />;
   if (!today.clock_in) return <ClockInCard today={today} workStart={workStart} workEnd={workEnd} />;
-  if (!today.clock_out && today.status !== "missed_clock_out") return <WorkingCard today={today} workEnd={workEnd} />;
+  if (!today.clock_out && today.status !== "missed_clock_out") return <WorkingCard today={today} workStart={workStart} workEnd={workEnd} />;
   return <DoneCard today={today} />;
 }
 
@@ -107,7 +107,7 @@ function ClockInCard({ today, workStart, workEnd }: { today: DayRecord; workStar
 
 /* ------------------------------------------------------------------ */
 
-function WorkingCard({ today, workEnd }: { today: DayRecord; workEnd: string }) {
+function WorkingCard({ today, workStart, workEnd }: { today: DayRecord; workStart: string; workEnd: string }) {
   const router = useRouter();
   const [mins, setMins] = useState(() => minutesSince(today.clock_in!));
   const [open, setOpen] = useState(false);
@@ -117,6 +117,12 @@ function WorkingCard({ today, workEnd }: { today: DayRecord; workEnd: string }) 
   const [summary, setSummary] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+
+  const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const fullShift = toMin(workEnd) - toMin(workStart);
+  // On a half-day leave only half the shift is owed.
+  const shift = today.day_kind === "half_leave" ? Math.floor(fullShift / 2) : fullShift;
+  const clearAt = formatTime(new Date(new Date(today.clock_in!).getTime() + shift * 60_000).toISOString());
 
   useEffect(() => {
     const t = setInterval(() => setMins(minutesSince(today.clock_in!)), 30_000);
@@ -158,6 +164,11 @@ function WorkingCard({ today, workEnd }: { today: DayRecord; workEnd: string }) 
               <p className="text-sm text-body">
                 Clocked in at <b className="text-ink">{formatTime(today.clock_in)}</b> · {formatDuration(mins)} so far · office closes at {workEnd}
               </p>
+              {today.is_late && (
+                <p className="mt-1 text-sm text-body">
+                  Work a full {formatDuration(shift)} (until <b className="text-ink">{clearAt}</b>) and the late mark goes away.
+                </p>
+              )}
             </div>
           </div>
           <Button variant="secondary" onClick={() => setOpen(true)}>
