@@ -3,19 +3,23 @@ import { AppShell } from "@/components/layout/app-shell";
 import { requireRole } from "@/lib/auth";
 import type { MyShift } from "@/lib/attendance";
 import { createClient } from "@/lib/supabase/server";
+import { unreadForEmployee } from "@/lib/requests";
 
 export const dynamic = "force-dynamic";
 
 export default async function EmployeeLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
-  const [{ profile }, { data: shiftData }, { data: steps }] = await Promise.all([
+  const [{ profile }, { data: shiftData }, { data: steps }, { data: reqs }] = await Promise.all([
     requireRole("employee"),
     supabase.rpc("my_shift"),
     // RLS: only this employee's onboarding steps.
     supabase.from("employee_tasks").select("owner, done_at").eq("kind", "onboarding"),
+    // RLS: only this employee's requests. Badge = HR replies they haven't opened.
+    supabase.from("hr_requests").select("last_admin_at, employee_seen_at").not("last_admin_at", "is", null),
   ]);
   // "Getting started" shows once onboarding has begun; the badge counts the steps they still have to do.
-  const badges = steps?.length ? { "/app/setup": steps.filter((t) => t.owner === "employee" && !t.done_at).length } : undefined;
+  const badges: Record<string, number> = { "/app/requests": (reqs ?? []).filter(unreadForEmployee).length };
+  if (steps?.length) badges["/app/setup"] = steps.filter((t) => t.owner === "employee" && !t.done_at).length;
   const shift = shiftData as MyShift | null;
   // RLS returns only this employee's rows. A night shift keeps the date it started on.
   const { data: open } = shift?.tracked

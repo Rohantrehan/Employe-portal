@@ -1,6 +1,7 @@
 import {
   FileSignature,
   ListChecks,
+  MessageSquareText,
   CalendarDays,
   CalendarHeart,
   Clock3,
@@ -34,6 +35,7 @@ export const NAV: Record<Area, NavGroup[]> = {
         { href: "/admin/employees", label: "Employees", icon: Users },
         { href: "/admin/leaves", label: "Leave requests", icon: Plane },
         { href: "/admin/overtime", label: "Extra hours", icon: Timer },
+        { href: "/admin/requests", label: "Requests", icon: MessageSquareText },
       ],
     },
     {
@@ -64,6 +66,7 @@ export const NAV: Record<Area, NavGroup[]> = {
       title: "Me",
       items: [
         { href: "/app/setup", label: "Getting started", icon: ListChecks, optional: true },
+        { href: "/app/requests", label: "Requests to HR", icon: MessageSquareText },
         { href: "/app/documents", label: "Documents", icon: FileSignature },
         { href: "/app/payslips", label: "Payslips", icon: FileText },
         { href: "/app/profile", label: "Profile", icon: UserRound },
