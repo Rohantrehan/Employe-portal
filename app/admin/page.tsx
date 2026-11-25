@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowUpRight, BriefcaseBusiness, CalendarClock, ClipboardCheck, FileSignature, Palmtree, UserX, Users } from "lucide-react";
+import { ArrowUpRight, ListChecks, BriefcaseBusiness, CalendarClock, ClipboardCheck, FileSignature, Palmtree, UserX, Users } from "lucide-react";
 import { BarChart } from "@/components/charts/bar-chart";
 import { BarList, ChartCard, Headline } from "@/components/charts/chart-card";
 import { SERIES, formatValue } from "@/components/charts/chart-utils";
 import { LineChart } from "@/components/charts/line-chart";
 import { PageHeader, StatTile } from "@/components/ui/misc";
+import { Badge } from "@/components/ui/badge";
 import { requireRole } from "@/lib/auth";
 import { formatDate, formatINR, todayIST } from "@/lib/format";
 import { daysUntil } from "@/lib/letters";
@@ -34,7 +35,7 @@ const sum = (xs: number[]) => xs.reduce((a, b) => a + Number(b), 0);
 
 export default async function AdminDashboard() {
   const { supabase, profile } = await requireRole("admin");
-  const [{ data, error }, { count: fixCount }, { data: contractRows }] = await Promise.all([
+  const [{ data, error }, { count: fixCount }, { data: contractRows }, { data: taskRows }] = await Promise.all([
     supabase.rpc("admin_dashboard"),
     supabase.from("clockout_fix_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
     supabase
@@ -43,7 +44,22 @@ export default async function AdminDashboard() {
       .eq("kind", "contract")
       .eq("status", "issued")
       .gte("date_to", todayIST()),
+    supabase.from("employee_tasks").select("employee_id, kind, owner, done_at, profiles!employee_tasks_employee_id_fkey(full_name)"),
   ]);
+  // Onboarding / offboarding lists that still have open steps.
+  type TRow = { employee_id: string; kind: "onboarding" | "offboarding"; owner: string; done_at: string | null; profiles: { full_name: string } | null };
+  const openLists = Object.values(
+    ((taskRows ?? []) as unknown as TRow[]).reduce<Record<string, { id: string; name: string; kind: TRow["kind"]; total: number; done: number; mine: number }>>((acc, t) => {
+      const k = t.employee_id + t.kind;
+      const g = (acc[k] ??= { id: t.employee_id, name: t.profiles?.full_name ?? "—", kind: t.kind, total: 0, done: 0, mine: 0 });
+      g.total += 1;
+      if (t.done_at) g.done += 1;
+      else if (t.owner === "admin") g.mine += 1;
+      return acc;
+    }, {}),
+  )
+    .filter((g) => g.done < g.total)
+    .sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "offboarding" ? -1 : 1));
   // Contracts that end within 30 days and have not been renewed yet.
   const today0 = todayIST();
   type CRow = { employee_id: string; date_from: string; date_to: string; profiles: { full_name: string; is_active: boolean } | null };
@@ -143,6 +159,31 @@ export default async function AdminDashboard() {
                 </li>
               );
             })}
+          </ul>
+        </section>
+      )}
+
+      {openLists.length > 0 && (
+        <section aria-label="Open checklists" className="card mt-6 p-5 sm:p-6">
+          <div className="flex items-center gap-2">
+            <ListChecks className="h-[18px] w-[18px] text-info" />
+            <h2 className="text-base font-bold tracking-[-0.01em] text-ink">Open checklists</h2>
+          </div>
+          <p className="mt-0.5 text-sm text-body">Onboarding and offboarding steps that aren&apos;t finished yet.</p>
+          <ul className="mt-3 divide-y divide-line">
+            {openLists.map((g) => (
+              <li key={g.id + g.kind}>
+                <Link href={`/admin/employees/${g.id}#${g.kind}`} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2.5 text-sm hover:text-brand">
+                  <span className="flex items-center gap-2">
+                    <span className="font-semibold text-ink">{g.name}</span>
+                    <Badge tone={g.kind === "offboarding" ? "warning" : "info"}>{g.kind === "offboarding" ? "Offboarding" : "Onboarding"}</Badge>
+                  </span>
+                  <span className="text-body">
+                    {g.done} of {g.total} done{g.mine ? <b className="font-semibold text-ink"> · {g.mine} for you</b> : null}
+                  </span>
+                </Link>
+              </li>
+            ))}
           </ul>
         </section>
       )}

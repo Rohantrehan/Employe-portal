@@ -11,6 +11,8 @@ import { formatDate, formatINR, formatPhone, todayIST } from "@/lib/format";
 import { EditEmployeeForm } from "./edit-employee-form";
 import { AccountActions } from "./account-actions";
 import { HirePanel } from "./hire-panel";
+import { ChecklistPanel, type Milestone } from "./checklist-panel";
+import { contractClass, ITEM_COLUMNS, TASK_COLUMNS, type ChecklistItem, type Task } from "@/lib/checklists";
 import { ExitPanel, type AdminLetter, type ExitInfo, type FinalPayslip, type LetterEvent } from "./exit-panel";
 
 export const metadata: Metadata = { title: "Employee" };
@@ -20,10 +22,10 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const { supabase, profile: me } = await requireRole("admin");
 
-  const [{ data: emp }, { data: departments }, { data: balances }, { data: exit }, { data: letters }, { data: events }, { data: settings }, { count: signatures }] = await Promise.all([
+  const [{ data: emp }, { data: departments }, { data: balances }, { data: exit }, { data: letters }, { data: events }, { data: settings }, { count: signatures }, { data: tasks }, { data: items }, { data: milestones }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, emp_code, full_name, email, phone, designation, department_id, date_of_joining, basic_salary, role, schedule, shift_start, shift_end, is_active, must_change_password, avatar_url, created_at, left_on, former_access, departments(name)")
+      .select("id, emp_code, full_name, email, phone, designation, department_id, date_of_joining, basic_salary, role, schedule, shift_start, shift_end, is_active, must_change_password, avatar_url, created_at, left_on, former_access, linkedin_url, departments(name)")
       .eq("id", id)
       .maybeSingle(),
     supabase.from("departments").select("id, name").order("name"),
@@ -46,6 +48,9 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
       .limit(300),
     supabase.from("settings").select("company_name, letter_experience_template, letter_relieving_template, letter_offer_template, letter_contract_template").single(),
     supabase.from("letter_signatures").select("id", { count: "exact", head: true }).is("retired_at", null),
+    supabase.from("employee_tasks").select(TASK_COLUMNS).eq("employee_id", id),
+    supabase.from("checklist_items").select(ITEM_COLUMNS).order("sort_order"),
+    supabase.from("linkedin_milestones").select("years, status, post_url, created_at").eq("employee_id", id).order("years"),
   ]);
   if (!emp) notFound();
 
@@ -58,6 +63,13 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
     twoFactor = !!f?.factors.some((x) => x.status === "verified");
   }
   const today = todayIST();
+  const allTasks = (tasks ?? []) as Task[];
+  const allItems = (items ?? []) as ChecklistItem[];
+  const contract = allLetters
+    .filter((l) => l.kind === "contract" && l.status !== "cancelled")
+    .sort((a, b) => Number(b.status === "issued") - Number(a.status === "issued") || b.date_from.localeCompare(a.date_from))[0];
+  const contractCls = contract ? contractClass(contract.date_from, contract.date_to) : null;
+  const firstName = emp.full_name.split(" ")[0];
   const exitMonth = exit ? exit.last_day.slice(0, 7) + "-01" : null;
   const { data: finalSlip } = exitMonth
     ? await supabase.from("payslips").select("status, payment_status").eq("employee_id", id).eq("month", exitMonth).maybeSingle()
@@ -151,6 +163,20 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
             today={today}
           />
         </div>
+        {(!exit || allTasks.some((t) => t.kind === "onboarding")) && (
+        <div id="onboarding">
+          <ChecklistPanel
+            employeeId={emp.id}
+            firstName={firstName}
+            kind="onboarding"
+            tasks={allTasks.filter((t) => t.kind === "onboarding")}
+            items={allItems.filter((i) => i.kind === "onboarding")}
+            contractCls={contractCls}
+            blocked={emp.role === "admin" ? "Admins don't get an onboarding checklist." : null}
+            linkedin={{ url: emp.linkedin_url, milestones: (milestones ?? []) as Milestone[] }}
+          />
+        </div>
+        )}
         <div id="exit">
           <ExitPanel
             employee={{
@@ -174,6 +200,19 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
             today={today}
           />
         </div>
+        {exit && (
+          <div id="offboarding">
+            <ChecklistPanel
+              employeeId={emp.id}
+              firstName={firstName}
+              kind="offboarding"
+              tasks={allTasks.filter((t) => t.kind === "offboarding")}
+              items={allItems.filter((i) => i.kind === "offboarding")}
+              contractCls={contractCls}
+              blocked={null}
+            />
+          </div>
+        )}
         </div>
 
         <div className="space-y-6">

@@ -1,5 +1,6 @@
 import {
   FileSignature,
+  ListChecks,
   CalendarDays,
   CalendarHeart,
   Clock3,
@@ -15,7 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export type NavItem = { href: string; label: string; icon: LucideIcon; exact?: boolean };
+export type NavItem = { href: string; label: string; icon: LucideIcon; exact?: boolean; optional?: boolean };
 export type NavGroup = { title?: string; items: NavItem[] };
 export type Area = "admin" | "employee" | "former";
 
@@ -62,6 +63,7 @@ export const NAV: Record<Area, NavGroup[]> = {
     {
       title: "Me",
       items: [
+        { href: "/app/setup", label: "Getting started", icon: ListChecks, optional: true },
         { href: "/app/documents", label: "Documents", icon: FileSignature },
         { href: "/app/payslips", label: "Payslips", icon: FileText },
         { href: "/app/profile", label: "Profile", icon: UserRound },

@@ -3,13 +3,15 @@ import { PageHeader } from "@/components/ui/misc";
 import { requireRole } from "@/lib/auth";
 import { LetterSettings, type SignatureVersion } from "./letter-settings";
 import { SecurityCard } from "./security-card";
+import { ChecklistSettings } from "./checklist-settings";
+import { ITEM_COLUMNS, type ChecklistItem } from "@/lib/checklists";
 import { SettingsForm } from "./settings-form";
 
 export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
   const { supabase } = await requireRole("admin");
-  const [{ data }, { data: sigs }, { data: used }, { data: factors }] = await Promise.all([
+  const [{ data }, { data: sigs }, { data: used }, { data: factors }, { data: items }] = await Promise.all([
     supabase
       .from("settings")
       .select("company_name, work_start, work_end, grace_minutes, half_day_min_hours, letter_prefix, letter_experience_template, letter_relieving_template, letter_offer_template, letter_contract_template")
@@ -17,6 +19,7 @@ export default async function SettingsPage() {
     supabase.from("letter_signatures").select("id, signer_name, signer_title, signature_path, seal_path, created_at, retired_at").order("created_at", { ascending: false }).limit(20),
     supabase.from("letters").select("signature_id").not("signature_id", "is", null),
     supabase.auth.mfa.listFactors(),
+    supabase.from("checklist_items").select(ITEM_COLUMNS).order("sort_order"),
   ]);
   const factor = factors?.all.find((f) => f.factor_type === "totp" && f.status === "verified");
 
@@ -37,7 +40,7 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Company" title="Settings" description="Office hours, attendance rules, and the signature and wording on letters." />
+      <PageHeader eyebrow="Company" title="Settings" description="Office hours, attendance rules, onboarding checklists, and the signature and wording on letters." />
       <SettingsForm
         initial={{
           company_name: data?.company_name ?? "RohTre Media",
@@ -48,6 +51,7 @@ export default async function SettingsPage() {
         }}
       />
       <SecurityCard since={factor?.created_at ?? null} />
+      <ChecklistSettings items={(items ?? []) as ChecklistItem[]} />
       <LetterSettings
         versions={versions}
         wording={{

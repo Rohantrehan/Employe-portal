@@ -11,7 +11,10 @@ import { AREA_HOME, AREA_LABEL, NAV, isActive, type Area } from "./nav";
 
 export type ShellUser = { name: string; email: string; avatarUrl?: string | null; subtitle?: string };
 
-function Sidebar({ area, user, onNavigate }: { area: Area; user: ShellUser; onNavigate?: () => void }) {
+/** Counts shown next to menu items, by href. An item marked `optional` only shows when it has an entry here. */
+export type NavBadges = Record<string, number>;
+
+function Sidebar({ area, user, badges, onNavigate }: { area: Area; user: ShellUser; badges?: NavBadges; onNavigate?: () => void }) {
   const pathname = usePathname();
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-rail text-rail-text">
@@ -36,7 +39,8 @@ function Sidebar({ area, user, onNavigate }: { area: Area; user: ShellUser; onNa
               <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">{group.title}</p>
             )}
             <ul className="space-y-0.5">
-              {group.items.map((item) => {
+              {group.items.filter((item) => !item.optional || badges?.[item.href] !== undefined).map((item) => {
+                const count = badges?.[item.href] ?? 0;
                 const active = isActive(pathname, item);
                 const Icon = item.icon;
                 return (
@@ -60,6 +64,11 @@ function Sidebar({ area, user, onNavigate }: { area: Area; user: ShellUser; onNa
                         <Icon className="h-[17px] w-[17px]" />
                       </span>
                       {item.label}
+                      {count > 0 && (
+                        <span className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1.5 text-[11px] font-bold text-white" aria-label={`${count} to do`}>
+                          {count}
+                        </span>
+                      )}
                     </Link>
                   </li>
                 );
@@ -96,10 +105,12 @@ export function AppShell({
   area,
   user,
   topbarRight,
+  badges,
   children,
 }: {
   area: Area;
   user: ShellUser;
+  badges?: NavBadges;
   topbarRight?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -124,7 +135,7 @@ export function AppShell({
     <div className="min-h-screen bg-app">
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] lg:block">
-        <Sidebar area={area} user={user} />
+        <Sidebar area={area} user={user} badges={badges} />
       </aside>
 
       {/* Mobile drawer */}
@@ -139,7 +150,7 @@ export function AppShell({
             open ? "translate-x-0" : "-translate-x-full",
           )}
         >
-          <Sidebar area={area} user={user} onNavigate={() => setOpen(false)} />
+          <Sidebar area={area} user={user} badges={badges} onNavigate={() => setOpen(false)} />
           <button
             onClick={() => setOpen(false)}
             aria-label="Close menu"

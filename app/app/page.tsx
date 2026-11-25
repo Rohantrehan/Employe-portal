@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowUpRight, CalendarCheck, CalendarHeart, Clock3, Hourglass, TimerReset, Wallet } from "lucide-react";
+import { ArrowUpRight, ListChecks, CalendarCheck, CalendarHeart, Clock3, Hourglass, TimerReset, Wallet } from "lucide-react";
 import { BarChart } from "@/components/charts/bar-chart";
 import { ChartCard, Headline } from "@/components/charts/chart-card";
 import { BLUE_RAMP } from "@/components/charts/chart-utils";
@@ -15,6 +15,8 @@ import { ClockoutFix, type FixRequest } from "@/components/attendance/clockout-f
 import { isSalaryWindow, monthTitle } from "@/lib/payroll";
 import { shiftMonth } from "@/lib/overtime";
 import { ClockCard } from "./clock-card";
+import { AnniversaryCard } from "@/components/checklist/anniversary-card";
+import { recentAnniversary } from "@/lib/checklists";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -36,7 +38,7 @@ export default async function EmployeeDashboard() {
   const monthStart = today.slice(0, 8) + "01";
 
   const since = new Date(Date.parse(today + "T00:00:00Z") - 30 * 86_400_000).toISOString().slice(0, 10);
-  const [{ data: month }, { data: shiftData }, { data: mine }, { data: balances }, { data: types }, { data: missedRows }, { data: fixReqs }] = await Promise.all([
+  const [{ data: month }, { data: shiftData }, { data: mine }, { data: balances }, { data: types }, { data: missedRows }, { data: fixReqs }, { data: steps }, { data: me }, { data: milestones }, { data: company }] = await Promise.all([
     supabase.rpc("employee_month", { p_employee: profile.id, p_month: monthStart }),
     supabase.rpc("my_shift"),
     supabase.rpc("my_dashboard", { p_days: 14 }),
@@ -56,7 +58,15 @@ export default async function EmployeeDashboard() {
       .eq("employee_id", profile.id)
       .gte("work_date", since)
       .order("created_at", { ascending: false }),
+    supabase.from("employee_tasks").select("owner, done_at").eq("employee_id", profile.id).eq("kind", "onboarding"),
+    supabase.from("profiles").select("date_of_joining").eq("id", profile.id).single(),
+    supabase.from("linkedin_milestones").select("years").eq("employee_id", profile.id),
+    supabase.from("settings").select("company_name").single(),
   ]);
+  const myLeft = (steps ?? []).filter((t) => t.owner === "employee" && !t.done_at).length;
+  const myDone = (steps ?? []).filter((t) => t.done_at).length;
+  const anniversary = recentAnniversary(me?.date_of_joining ?? null, today);
+  const showAnniversary = anniversary && !(milestones ?? []).some((m) => m.years === anniversary.years);
   const missed = (missedRows ?? []).map((a) => ({
     attendance_id: a.id as string,
     day: a.work_date as string,
@@ -143,6 +153,26 @@ export default async function EmployeeDashboard() {
             received yours yet. Salaries are credited between the 1st and 10th of the month.
           </p>
         </div>
+      )}
+
+      {showAnniversary && <AnniversaryCard years={anniversary.years} daysSince={anniversary.daysSince} company={company?.company_name ?? "RohTre Media"} />}
+
+      {myLeft > 0 && (
+        <Link
+          href="/app/setup"
+          className="animate-enter group mt-6 flex items-center gap-4 rounded-[24px] border border-line bg-white p-5 transition hover:border-body/30 sm:p-6"
+        >
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-tint text-brand">
+            <ListChecks className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-base font-bold text-ink">Finish getting set up</span>
+            <span className="block text-sm text-body">
+              {myLeft} step{myLeft === 1 ? "" : "s"} left for you · {myDone} of {(steps ?? []).length} done
+            </span>
+          </span>
+          <ArrowUpRight className="h-5 w-5 shrink-0 text-body transition group-hover:text-ink" />
+        </Link>
       )}
 
       {missed.length > 0 && (
