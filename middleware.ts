@@ -30,7 +30,7 @@ export async function middleware(request: NextRequest) {
   // Verified locally with the project's public signing key (no network call per request).
   // Also refreshes an expired session and writes the new cookies via setAll above.
   const { data } = await supabase.auth.getClaims();
-  const user = data?.claims?.sub ? { app_metadata: data.claims.app_metadata } : null;
+  const user = data?.claims?.sub ? { app_metadata: data.claims.app_metadata, aal: data.claims.aal as string | undefined } : null;
   const path = request.nextUrl.pathname;
 
   const redirectTo = (to: string) => {
@@ -48,7 +48,10 @@ export async function middleware(request: NextRequest) {
     // role lives in app_metadata (set server-side only), so no DB call is needed here
     const role = (user.app_metadata as { role?: string } | undefined)?.role === "admin" ? "admin" : "employee";
     const home = role === "admin" ? "/admin" : "/app";
-    if (path === "/" || path === "/login") return redirectTo(home);
+    // Admins must pass the authenticator-app step before anything else.
+    if (role === "admin" && user.aal !== "aal2" && path !== "/mfa" && !isPublic(path)) return redirectTo("/mfa");
+    if (role === "admin" && user.aal !== "aal2" && path === "/login") return redirectTo("/mfa");
+    if (path === "/" || path === "/login" || (role === "employee" && path === "/mfa")) return redirectTo(home);
     // Wrong area → own home (layouts re-check this against the database)
     if (role === "employee" && (path === "/admin" || path.startsWith("/admin/"))) return redirectTo(home);
     if (role === "admin" && (path === "/app" || path.startsWith("/app/") || path === "/former")) return redirectTo(home);

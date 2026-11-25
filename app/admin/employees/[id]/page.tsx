@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/misc";
 import { requireRole } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDate, formatINR, formatPhone, todayIST } from "@/lib/format";
 import { EditEmployeeForm } from "./edit-employee-form";
 import { AccountActions } from "./account-actions";
@@ -48,6 +49,12 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
   if (!emp) notFound();
 
   const isMe = emp.id === me.id;
+  // Other admins: has 2-step sign-in been set up? (factors are only visible with the service key)
+  let twoFactor: boolean | null = null;
+  if (emp.role === "admin" && !isMe) {
+    const { data: f } = await createAdminClient().auth.admin.mfa.listFactors({ userId: emp.id });
+    twoFactor = !!f?.factors.some((x) => x.status === "verified");
+  }
   const today = todayIST();
   const exitMonth = exit ? exit.last_day.slice(0, 7) + "-01" : null;
   const { data: finalSlip } = exitMonth
@@ -191,7 +198,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
             </CardBody>
           </Card>
 
-          <AccountActions id={emp.id} name={emp.full_name} isActive={emp.is_active} isMe={isMe} hasExit={!!exit} formerAccess={emp.former_access} />
+          <AccountActions id={emp.id} name={emp.full_name} isActive={emp.is_active} isMe={isMe} hasExit={!!exit} formerAccess={emp.former_access} twoFactor={twoFactor} />
         </div>
       </div>
     </>

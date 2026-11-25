@@ -34,12 +34,14 @@ export const getSession = cache(async () => {
   const claims = data?.claims;
   if (!claims?.sub) return null;
   const user = { id: claims.sub, email: (claims.email as string | undefined) ?? null };
+  // "aal2" once the authenticator-app step is done (required for admins).
+  const aal = (claims.aal as string | undefined) ?? "aal1";
   const { data: profile } = await supabase
     .from("profiles")
     .select("id, role, emp_code, full_name, email, designation, avatar_url, is_active, must_change_password, left_on, former_access")
     .eq("id", user.id)
     .single<Profile>();
-  return { user, profile, supabase };
+  return { user, profile, supabase, aal };
 });
 
 /**
@@ -47,6 +49,7 @@ export const getSession = cache(async () => {
  * - not logged in → /login
  * - left (past last working day) → /former (documents only)
  * - inactive or no profile → /login?error=inactive
+ * - admin without the authenticator-app step → /mfa
  * - must change password → /change-password
  * - wrong role → that role's home
  */
@@ -57,6 +60,7 @@ export async function requireRole(role: Role) {
   // Past their last working day → documents-only area (or out, if the admin turned that off).
   if (profile && isFormer(profile)) redirect(profile.former_access ? "/former" : "/auth/logout?reason=inactive");
   if (!profile || !profile.is_active) redirect("/auth/logout?reason=inactive");
+  if (profile.role === "admin" && session.aal !== "aal2") redirect("/mfa");
   if (profile.must_change_password) redirect("/change-password");
   if (profile.role !== role) redirect(homeFor(profile.role));
   return { ...session, profile };

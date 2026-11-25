@@ -218,3 +218,24 @@ export async function deleteDepartment(id: string): Promise<ActionResult> {
   revalidatePath("/admin/employees");
   return { ok: true };
 }
+
+// ---------------------------------------------------------------------
+// Reset another admin's 2-step sign-in (lost phone)
+// ---------------------------------------------------------------------
+export async function resetAdminTwoFactor(id: string): Promise<ActionResult> {
+  const { supabase, profile: me } = await requireRole("admin");
+  if (id === me.id) return { ok: false, error: "Change your own app from Settings instead." };
+  const { data: target } = await supabase.from("profiles").select("role").eq("id", id).single();
+  if (target?.role !== "admin") return { ok: false, error: "Only admins use 2-step sign-in." };
+
+  const admin = createAdminClient();
+  const { data, error } = await admin.auth.admin.mfa.listFactors({ userId: id });
+  if (error) return { ok: false, error: "Could not reach the login service. Please try again." };
+  for (const f of data.factors) {
+    const { error: de } = await admin.auth.admin.mfa.deleteFactor({ id: f.id, userId: id });
+    if (de) return { ok: false, error: "Could not reset it. Please try again." };
+  }
+  await supabase.rpc("log_action", { p_action: "admin.2fa_reset", p_entity: "profile", p_entity_id: id, p_payload: null });
+  revalidatePath(`/admin/employees/${id}`);
+  return { ok: true, message: "Reset. They will set up a new app at their next login." };
+}

@@ -2,12 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { KeyRound, ShieldCheck, UserX } from "lucide-react";
+import { KeyRound, ShieldCheck, ShieldOff, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
-import { resetEmployeePassword, setEmployeeActive } from "../actions";
+import { resetAdminTwoFactor, resetEmployeePassword, setEmployeeActive } from "../actions";
 import { CredentialsPanel } from "../credentials-panel";
 
 export function AccountActions({
@@ -17,6 +17,7 @@ export function AccountActions({
   isMe,
   hasExit = false,
   formerAccess = false,
+  twoFactor = null,
 }: {
   id: string;
   name: string;
@@ -24,10 +25,12 @@ export function AccountActions({
   isMe: boolean;
   hasExit?: boolean;
   formerAccess?: boolean;
+  /** For admins: whether they have set up 2-step sign-in. null = not an admin. */
+  twoFactor?: boolean | null;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [dialog, setDialog] = useState<null | "reset" | "deactivate">(null);
+  const [dialog, setDialog] = useState<null | "reset" | "deactivate" | "mfa">(null);
   const [creds, setCreds] = useState<{ email: string; password: string } | null>(null);
 
   const close = () => {
@@ -40,6 +43,15 @@ export function AccountActions({
       const res = await resetEmployeePassword(id);
       if (!res.ok) return void toast.error(res.error ?? "Could not reset the password");
       setCreds(res.data!);
+      router.refresh();
+    });
+
+  const doResetMfa = () =>
+    start(async () => {
+      const res = await resetAdminTwoFactor(id);
+      if (!res.ok) return void toast.error(res.error ?? "Could not reset it");
+      toast.success(res.message ?? "Reset");
+      setDialog(null);
       router.refresh();
     });
 
@@ -70,6 +82,11 @@ export function AccountActions({
         <Button variant="secondary" block onClick={() => setDialog("reset")} disabled={!isActive && !(hasExit && formerAccess)}>
           <KeyRound className="h-4 w-4" /> Reset password
         </Button>
+        {twoFactor != null && (
+          <Button variant="secondary" block onClick={() => setDialog("mfa")} disabled={!twoFactor}>
+            <ShieldOff className="h-4 w-4" /> {twoFactor ? "Reset 2-step sign-in" : "2-step sign-in not set up yet"}
+          </Button>
+        )}
         {hasExit ? (
           <p className="pt-1 text-[13px] text-body">Login after leaving is managed under Exit &amp; letters.</p>
         ) : isActive ? (
@@ -106,6 +123,23 @@ export function AccountActions({
       >
         {creds && <CredentialsPanel email={creds.email} password={creds.password} />}
       </Modal>
+
+      <Modal
+        open={dialog === "mfa"}
+        onClose={close}
+        title={`Reset 2-step sign-in for ${name}?`}
+        description="Use this if they lost their phone. Their authenticator app stops working and they set up a new one at their next login."
+        footer={
+          <>
+            <Button variant="secondary" onClick={close}>
+              Cancel
+            </Button>
+            <Button loading={pending} onClick={doResetMfa}>
+              Reset
+            </Button>
+          </>
+        }
+      />
 
       <Modal
         open={dialog === "deactivate"}

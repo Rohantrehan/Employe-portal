@@ -2,20 +2,23 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/misc";
 import { requireRole } from "@/lib/auth";
 import { LetterSettings, type SignatureVersion } from "./letter-settings";
+import { SecurityCard } from "./security-card";
 import { SettingsForm } from "./settings-form";
 
 export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
   const { supabase } = await requireRole("admin");
-  const [{ data }, { data: sigs }, { data: used }] = await Promise.all([
+  const [{ data }, { data: sigs }, { data: used }, { data: factors }] = await Promise.all([
     supabase
       .from("settings")
       .select("company_name, work_start, work_end, grace_minutes, half_day_min_hours, letter_prefix, letter_experience_template, letter_relieving_template")
       .single(),
     supabase.from("letter_signatures").select("id, signer_name, signer_title, signature_path, seal_path, created_at, retired_at").order("created_at", { ascending: false }).limit(20),
     supabase.from("letters").select("signature_id").not("signature_id", "is", null),
+    supabase.auth.mfa.listFactors(),
   ]);
+  const factor = factors?.all.find((f) => f.factor_type === "totp" && f.status === "verified");
 
   // Private bucket: short-lived links so only the admin's browser can show the images.
   const paths = (sigs ?? []).flatMap((s) => [s.signature_path, s.seal_path]).filter((p): p is string => !!p);
@@ -44,6 +47,7 @@ export default async function SettingsPage() {
           half_day_min_hours: Number(data?.half_day_min_hours ?? 4),
         }}
       />
+      <SecurityCard since={factor?.created_at ?? null} />
       <LetterSettings
         versions={versions}
         wording={{
