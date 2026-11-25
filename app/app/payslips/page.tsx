@@ -5,7 +5,6 @@ import { buttonClass } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState, PageHeader, StatTile } from "@/components/ui/misc";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { MyLetters, type MyLetter } from "@/components/letters/my-letters";
 import { requireRole } from "@/lib/auth";
 import { formatDate, formatINR, todayIST } from "@/lib/format";
 import { formatHours } from "@/lib/overtime";
@@ -18,14 +17,12 @@ export default async function PayslipsPage() {
   const year = todayIST().slice(0, 4);
 
   // RLS only returns this employee's PUBLISHED payslips.
-  const [{ data }, { data: letters }] = await Promise.all([
+  const [{ data }] = await Promise.all([
     supabase
       .from("payslips")
       .select("id, month, working_days, present_days, leave_days, overtime_hours, basic_salary, excellence_bonus, rating, performance_bonus, night_shift_pay, remarks, net_pay, payment_status, paid_on, payment_ref")
       .eq("employee_id", profile.id)
       .order("month", { ascending: false }),
-    // Letters are issued from the last working day, so they can show up here before the account switches to documents-only.
-    supabase.from("letters").select("id, kind, status, ref_no, issue_date, cancelled_at").eq("employee_id", profile.id).order("issue_date", { ascending: false }),
   ]);
 
   const slips = (data ?? []).map((s) => ({
@@ -45,7 +42,6 @@ export default async function PayslipsPage() {
   return (
     <>
       <PageHeader eyebrow="Me" title="Payslips" description="Your monthly salary slips. Download any of them as a PDF." />
-      <MyLetters letters={(letters ?? []) as MyLetter[]} className="mt-8" />
 
       {!latest ? (
         <Card className="mt-8">

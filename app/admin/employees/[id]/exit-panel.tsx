@@ -36,6 +36,7 @@ import {
   verifyUrl,
   type Conduct,
   type ExitReason,
+  type ExitKind,
   type LetterKind,
   type LetterStatus,
   type Pronoun,
@@ -53,7 +54,8 @@ export type AdminLetter = {
   designation: string;
   department: string | null;
   date_from: string;
-  date_to: string;
+  date_to: string | null;
+  salary: number | null;
   conduct: Conduct | null;
   pronoun: Pronoun;
   body: string;
@@ -81,15 +83,15 @@ type Props = {
   exit: ExitInfo | null;
   letters: AdminLetter[];
   events: LetterEvent[];
-  templates: Record<LetterKind, string>;
+  templates: Record<ExitKind, string>;
   company: string;
   hasSignature: boolean;
   finalPayslip: FinalPayslip | null;
   today: string;
 };
 
-const KINDS: LetterKind[] = ["experience", "relieving"];
-const pdf = (id: string, view = false) => `/api/letters/${id}/pdf${view ? "?view=1" : ""}`;
+const KINDS: ExitKind[] = ["experience", "relieving"];
+export const pdf = (id: string, view = false) => `/api/letters/${id}/pdf${view ? "?view=1" : ""}`;
 
 export function ExitPanel(props: Props) {
   const { employee: emp, exit, letters, events, today } = props;
@@ -99,7 +101,7 @@ export function ExitPanel(props: Props) {
     | null
     | { type: "exit" }
     | { type: "undo" }
-    | { type: "letter"; kind: LetterKind; letter: AdminLetter | null }
+    | { type: "letter"; kind: ExitKind; letter: AdminLetter | null }
     | { type: "issue"; letter: AdminLetter }
     | { type: "cancel"; letter: AdminLetter }
     | { type: "history"; letter: AdminLetter }
@@ -325,7 +327,7 @@ function FinalPayslipRow({ p }: { p: FinalPayslip }) {
   );
 }
 
-function LetterRow({
+export function LetterRow({
   kind,
   all,
   events,
@@ -338,7 +340,18 @@ function LetterRow({
   onCancel,
   onHistory,
   onDelete,
+  title,
+  note,
+  tag,
+  emptyText = "Not prepared yet.",
+  canPrepare = true,
 }: {
+  title?: string;
+  /** Shown first in the line under the title, e.g. a contract term. */
+  note?: string;
+  tag?: React.ReactNode;
+  emptyText?: string;
+  canPrepare?: boolean;
   kind: LetterKind;
   all: AdminLetter[];
   events: LetterEvent[];
@@ -373,7 +386,8 @@ function LetterRow({
         </span>
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-2 font-semibold text-ink">
-            {KIND_LABEL[kind]}
+            {title ?? KIND_LABEL[kind]}
+            {tag}
             {live?.status === "draft" && <Badge tone="warning">Draft</Badge>}
             {live?.status === "issued" && (
               <Badge tone="success" dot>
@@ -382,17 +396,18 @@ function LetterRow({
             )}
           </p>
           <p className="mt-0.5 text-sm text-body">
+            {note && <span className="font-semibold text-ink">{note} · </span>}
             {!allowed
               ? "Turned off in the exit details."
               : !live
-                ? "Not prepared yet."
+                ? emptyText
                 : live.status === "draft"
                   ? (issueHint ?? "Ready to issue. Preview it first.")
                   : `${live.ref_no} · ${formatDate(live.issue_date)} · downloaded ${count(live, ["download", "view"])}× · QR checked ${count(live, ["verify"])}×`}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {allowed && !live && (
+          {allowed && canPrepare && !live && (
             <Button size="sm" onClick={() => onPrepare(null)}>
               <FilePlus2 className="h-3.5 w-3.5" /> Prepare
             </Button>
@@ -551,7 +566,7 @@ function LetterEditor({
 }: {
   emp: ExitEmployee;
   exit: ExitInfo;
-  kind: LetterKind;
+  kind: ExitKind;
   letter: AdminLetter | null;
   template: string;
   company: string;
@@ -691,7 +706,7 @@ function LetterEditor({
   );
 }
 
-function CancelModal({ letter, employeeId, onClose }: { letter: AdminLetter; employeeId: string; onClose: () => void }) {
+export function CancelModal({ letter, employeeId, onClose }: { letter: AdminLetter; employeeId: string; onClose: () => void }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [reason, setReason] = useState("");
@@ -734,7 +749,7 @@ function CancelModal({ letter, employeeId, onClose }: { letter: AdminLetter; emp
 
 const EVENT_LABEL: Record<LetterEvent["event"], string> = { download: "Downloaded", view: "Opened", verify: "QR code checked" };
 
-function HistoryModal({ letter, events, onClose }: { letter: AdminLetter; events: LetterEvent[]; onClose: () => void }) {
+export function HistoryModal({ letter, events, onClose }: { letter: AdminLetter; events: LetterEvent[]; onClose: () => void }) {
   const fmt = (iso: string) =>
     new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }).format(new Date(iso));
   return (

@@ -5,7 +5,16 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { formatDate } from "@/lib/format";
 import { KIND_LABEL, type LetterKind, type LetterStatus } from "@/lib/letters";
 
-export type MyLetter = { id: string; kind: LetterKind; status: LetterStatus; ref_no: string | null; issue_date: string | null; cancelled_at: string | null };
+export type MyLetter = {
+  id: string;
+  kind: LetterKind;
+  status: LetterStatus;
+  ref_no: string | null;
+  issue_date: string | null;
+  cancelled_at: string | null;
+  date_from?: string | null;
+  date_to?: string | null;
+};
 
 /** Employee's own letters (RLS never returns drafts). */
 export function MyLetters({ letters, className }: { letters: MyLetter[]; className?: string }) {
@@ -24,6 +33,12 @@ export function MyLetters({ letters, className }: { letters: MyLetter[]; classNa
               <p className="font-semibold text-ink">{KIND_LABEL[l.kind]}</p>
               <p className="mt-0.5 text-sm text-body">
                 <span className="whitespace-nowrap">{l.ref_no}</span> · <span className="whitespace-nowrap">issued {formatDate(l.issue_date)}</span>
+                {l.kind === "contract" && l.date_from && (
+                  <>
+                    {" "}
+                    · <span className="whitespace-nowrap">{formatDate(l.date_from)} – {formatDate(l.date_to)}</span>
+                  </>
+                )}
               </p>
             </div>
             {l.status === "issued" ? (

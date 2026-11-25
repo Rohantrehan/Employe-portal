@@ -72,6 +72,8 @@ const wordingSchema = z.object({
   prefix: z.string().trim().toUpperCase().regex(/^[A-Z]{2,6}$/, "The reference prefix must be 2 to 6 letters (A–Z)"),
   experience: z.string().trim().min(20, "The experience letter text is too short").max(5000),
   relieving: z.string().trim().min(20, "The relieving letter text is too short").max(5000),
+  offer: z.string().trim().min(20, "The offer letter text is too short").max(5000),
+  contract: z.string().trim().min(20, "The contract text is too short").max(5000),
 });
 
 export async function saveLetterWording(input: z.input<typeof wordingSchema>): Promise<Result> {
@@ -82,6 +84,8 @@ export async function saveLetterWording(input: z.input<typeof wordingSchema>): P
     p_prefix: parsed.data.prefix,
     p_experience: parsed.data.experience,
     p_relieving: parsed.data.relieving,
+    p_offer: parsed.data.offer,
+    p_contract: parsed.data.contract,
   });
   if (error) return { ok: false, error: error.code === "P0001" ? error.message : "Could not save the wording." };
   revalidatePath("/admin/settings");

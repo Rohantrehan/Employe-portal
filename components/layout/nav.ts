@@ -1,4 +1,5 @@
 import {
+  FileSignature,
   CalendarDays,
   CalendarHeart,
   Clock3,
@@ -61,6 +62,7 @@ export const NAV: Record<Area, NavGroup[]> = {
     {
       title: "Me",
       items: [
+        { href: "/app/documents", label: "Documents", icon: FileSignature },
         { href: "/app/payslips", label: "Payslips", icon: FileText },
         { href: "/app/profile", label: "Profile", icon: UserRound },
       ],

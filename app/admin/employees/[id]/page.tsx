@@ -10,6 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDate, formatINR, formatPhone, todayIST } from "@/lib/format";
 import { EditEmployeeForm } from "./edit-employee-form";
 import { AccountActions } from "./account-actions";
+import { HirePanel } from "./hire-panel";
 import { ExitPanel, type AdminLetter, type ExitInfo, type FinalPayslip, type LetterEvent } from "./exit-panel";
 
 export const metadata: Metadata = { title: "Employee" };
@@ -34,7 +35,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
     supabase.from("employee_exits").select("last_day, reason, conduct, letters_allowed, note").eq("employee_id", id).maybeSingle(),
     supabase
       .from("letters")
-      .select("id, kind, status, ref_no, issue_date, designation, department, date_from, date_to, conduct, pronoun, body, verify_code, cancelled_at, cancel_reason, created_at")
+      .select("id, kind, status, ref_no, issue_date, designation, department, date_from, date_to, salary, conduct, pronoun, body, verify_code, cancelled_at, cancel_reason, created_at")
       .eq("employee_id", id)
       .order("created_at", { ascending: false }),
     supabase
@@ -43,12 +44,13 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
       .eq("letters.employee_id", id)
       .order("created_at", { ascending: false })
       .limit(300),
-    supabase.from("settings").select("company_name, letter_experience_template, letter_relieving_template").single(),
+    supabase.from("settings").select("company_name, letter_experience_template, letter_relieving_template, letter_offer_template, letter_contract_template").single(),
     supabase.from("letter_signatures").select("id", { count: "exact", head: true }).is("retired_at", null),
   ]);
   if (!emp) notFound();
 
   const isMe = emp.id === me.id;
+  const allLetters = ((letters ?? []) as AdminLetter[]).map((l) => ({ ...l, salary: l.salary == null ? null : Number(l.salary) }));
   // Other admins: has 2-step sign-in been set up? (factors are only visible with the service key)
   let twoFactor: boolean | null = null;
   if (emp.role === "admin" && !isMe) {
@@ -129,6 +131,26 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
             shift_end: emp.shift_end,
           }}
         />
+        <div id="contract">
+          <HirePanel
+            employee={{
+              id: emp.id,
+              full_name: emp.full_name,
+              emp_code: emp.emp_code,
+              designation: emp.designation,
+              department: dept ?? null,
+              date_of_joining: emp.date_of_joining,
+              basic_salary: Number(emp.basic_salary),
+              role: emp.role,
+            }}
+            letters={allLetters.filter((l) => l.kind === "offer" || l.kind === "contract")}
+            events={letterEvents}
+            templates={{ offer: settings?.letter_offer_template ?? "", contract: settings?.letter_contract_template ?? "" }}
+            company={settings?.company_name ?? "RohTre Media"}
+            hasSignature={(signatures ?? 0) > 0}
+            today={today}
+          />
+        </div>
         <div id="exit">
           <ExitPanel
             employee={{
@@ -143,7 +165,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
               former_access: emp.former_access,
             }}
             exit={(exit as ExitInfo | null) ?? null}
-            letters={(letters ?? []) as AdminLetter[]}
+            letters={allLetters.filter((l) => l.kind === "experience" || l.kind === "relieving")}
             events={letterEvents}
             templates={{ experience: settings?.letter_experience_template ?? "", relieving: settings?.letter_relieving_template ?? "" }}
             company={settings?.company_name ?? "RohTre Media"}

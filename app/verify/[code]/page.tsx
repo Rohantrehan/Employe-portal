@@ -16,12 +16,12 @@ type Result = {
   designation: string;
   company: string;
   from: string;
-  to: string;
+  to: string | null;
   issue_date: string;
   cancelled_on: string | null;
 };
 
-/** Public page behind the QR code on every letter. Shows only what is printed on the letter itself. */
+/** Public page behind the QR code on every letter. Shows only what identifies the letter (never the salary). */
 export default async function VerifyPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
   const supabase = await createClient();
@@ -58,7 +58,11 @@ export default async function VerifyPage({ params }: { params: Promise<{ code: s
                 ["Reference", r.ref_no],
                 ["Name", `${r.name} (${r.emp_code})`],
                 ["Designation", r.designation],
-                ["Worked", `${longDate(r.from)} to ${longDate(r.to)}`],
+                r.kind === "offer"
+                  ? ["Joining date", longDate(r.from)]
+                  : r.kind === "contract"
+                    ? ["Contract term", `${longDate(r.from)} to ${longDate(r.to)}`]
+                    : ["Worked", `${longDate(r.from)} to ${longDate(r.to)}`],
                 ["Issued on", longDate(r.issue_date)],
               ].map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-4 py-3">

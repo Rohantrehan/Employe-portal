@@ -12,7 +12,7 @@ export default async function SettingsPage() {
   const [{ data }, { data: sigs }, { data: used }, { data: factors }] = await Promise.all([
     supabase
       .from("settings")
-      .select("company_name, work_start, work_end, grace_minutes, half_day_min_hours, letter_prefix, letter_experience_template, letter_relieving_template")
+      .select("company_name, work_start, work_end, grace_minutes, half_day_min_hours, letter_prefix, letter_experience_template, letter_relieving_template, letter_offer_template, letter_contract_template")
       .single(),
     supabase.from("letter_signatures").select("id, signer_name, signer_title, signature_path, seal_path, created_at, retired_at").order("created_at", { ascending: false }).limit(20),
     supabase.from("letters").select("signature_id").not("signature_id", "is", null),
@@ -54,6 +54,8 @@ export default async function SettingsPage() {
           prefix: data?.letter_prefix ?? "RT",
           experience: data?.letter_experience_template ?? "",
           relieving: data?.letter_relieving_template ?? "",
+          offer: data?.letter_offer_template ?? "",
+          contract: data?.letter_contract_template ?? "",
         }}
       />
     </>

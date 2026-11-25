@@ -10,7 +10,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Input, Textarea } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/format";
-import { PLACEHOLDERS } from "@/lib/letters";
+import { HIRE_PLACEHOLDERS, PLACEHOLDERS } from "@/lib/letters";
 import { saveLetterWording, saveSignature } from "./letters-actions";
 
 export type SignatureVersion = {
@@ -29,7 +29,7 @@ export function LetterSettings({
   wording,
 }: {
   versions: SignatureVersion[];
-  wording: { prefix: string; experience: string; relieving: string };
+  wording: { prefix: string; experience: string; relieving: string; offer: string; contract: string };
 }) {
   const current = versions.find((v) => !v.retired_at) ?? null;
   const old = versions.filter((v) => v.retired_at);
@@ -38,7 +38,7 @@ export function LetterSettings({
   return (
     <section id="letters" className="mt-10 scroll-mt-24">
       <h2 className="text-xl font-extrabold tracking-[-0.02em] text-ink">Letters &amp; signature</h2>
-      <p className="mt-1 text-sm text-body">Used on experience and relieving letters. Changing the signature never changes letters already issued.</p>
+      <p className="mt-1 text-sm text-body">Used on offer letters, contracts, and experience and relieving letters. Changing the signature never changes letters already issued.</p>
 
       <div className="mt-5 grid items-start gap-6 lg:grid-cols-2">
         <Card>
@@ -357,7 +357,7 @@ function SignaturePad({ ref }: { ref: React.Ref<PadHandle> }) {
   );
 }
 
-function WordingForm({ initial }: { initial: { prefix: string; experience: string; relieving: string } }) {
+function WordingForm({ initial }: { initial: { prefix: string; experience: string; relieving: string; offer: string; contract: string } }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [v, setV] = useState(initial);
@@ -380,20 +380,14 @@ function WordingForm({ initial }: { initial: { prefix: string; experience: strin
           maxLength={6}
           hint={`Numbers look like ${v.prefix || "RT"}/EXP/${new Date().getFullYear()}/001`}
         />
+        <p className="pt-2 text-[12px] font-bold uppercase tracking-wider text-body">Joining</p>
+        <Textarea label="Offer letter" rows={8} value={v.offer} onChange={(e) => setV({ ...v, offer: e.target.value })} maxLength={5000} />
+        <Textarea label="Employment contract" rows={8} value={v.contract} onChange={(e) => setV({ ...v, contract: e.target.value })} maxLength={5000} />
+        <Placeholders title="Words you can use in offer letters and contracts" items={HIRE_PLACEHOLDERS} />
+        <p className="pt-2 text-[12px] font-bold uppercase tracking-wider text-body">Leaving</p>
         <Textarea label="Experience letter" rows={7} value={v.experience} onChange={(e) => setV({ ...v, experience: e.target.value })} maxLength={5000} />
         <Textarea label="Relieving letter" rows={6} value={v.relieving} onChange={(e) => setV({ ...v, relieving: e.target.value })} maxLength={5000} />
-        <details className="rounded-2xl bg-soft px-4 py-3 text-sm">
-          <summary className="cursor-pointer font-semibold text-ink">Words you can use</summary>
-          <dl className="mt-3 grid gap-x-4 gap-y-1.5 sm:grid-cols-[auto_1fr]">
-            {PLACEHOLDERS.map(([k, d]) => (
-              <div key={k} className="contents">
-                <dt className="font-mono text-[13px] text-ink">{k}</dt>
-                <dd className="text-body">{d}</dd>
-              </div>
-            ))}
-          </dl>
-          <p className="mt-3 text-[13px] text-body">Leave a blank line between paragraphs.</p>
-        </details>
+        <Placeholders title="Words you can use in experience and relieving letters" items={PLACEHOLDERS} />
         <div className="flex justify-end">
           <Button onClick={submit} loading={pending}>
             Save wording
@@ -401,5 +395,22 @@ function WordingForm({ initial }: { initial: { prefix: string; experience: strin
         </div>
       </CardBody>
     </Card>
+  );
+}
+
+function Placeholders({ title, items }: { title: string; items: readonly (readonly [string, string])[] }) {
+  return (
+    <details className="rounded-2xl bg-soft px-4 py-3 text-sm">
+      <summary className="cursor-pointer font-semibold text-ink">{title}</summary>
+      <dl className="mt-3 grid gap-x-4 gap-y-1.5 sm:grid-cols-[auto_1fr]">
+        {items.map(([k, d]) => (
+          <div key={k} className="contents">
+            <dt className="font-mono text-[13px] text-ink">{k}</dt>
+            <dd className="text-body">{d}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 text-[13px] text-body">Leave a blank line between paragraphs.</p>
+    </details>
   );
 }

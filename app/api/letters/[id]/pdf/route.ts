@@ -19,7 +19,7 @@ async function loadImage(path: string | null): Promise<Img | null> {
 }
 
 /**
- * Experience / relieving letter PDF, rendered on demand from the frozen letter text.
+ * Letter PDF (offer, contract, experience, relieving), rendered on demand from the frozen letter text.
  * Who can read the letter is decided by RLS (admin: all; employee: own, not drafts).
  * The signature images are private, so they are fetched with the service key only
  * after RLS has returned the letter. Every non-draft download is logged.
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const { data: l } = await supabase
     .from("letters")
-    .select("id, employee_id, kind, status, ref_no, issue_date, full_name, emp_code, designation, company_name, body, cancelled_at, signature_id, verify_code")
+    .select("id, employee_id, kind, status, ref_no, issue_date, full_name, emp_code, designation, department, date_from, date_to, salary, company_name, body, cancelled_at, signature_id, verify_code")
     .eq("id", id)
     .maybeSingle();
   if (!l) return new NextResponse("Letter not found", { status: 404 });
@@ -65,6 +65,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         full_name: l.full_name,
         emp_code: l.emp_code,
         designation: l.designation,
+        department: l.department,
+        date_from: l.date_from,
+        date_to: l.date_to,
+        salary: l.salary == null ? null : Number(l.salary),
         company_name: l.company_name,
         body: l.body,
         cancelled_at: l.cancelled_at,
@@ -78,7 +82,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const inline = request.nextUrl.searchParams.get("view") === "1";
   if (l.status !== "draft") await supabase.rpc("log_letter_event", { p_letter: l.id, p_event: inline ? "view" : "download" });
 
-  const kind = l.kind === "experience" ? "Experience-Letter" : "Relieving-Letter";
+  const kind = { experience: "Experience-Letter", relieving: "Relieving-Letter", offer: "Offer-Letter", contract: "Employment-Contract" }[l.kind as LetterKind] ?? "Letter";
   const filename = `${kind}-${l.emp_code}${l.status === "draft" ? "-DRAFT" : ""}.pdf`;
   return new NextResponse(new Uint8Array(pdf), {
     headers: {

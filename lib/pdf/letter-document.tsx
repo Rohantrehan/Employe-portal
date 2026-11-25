@@ -1,6 +1,6 @@
 import "server-only";
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
-import { KIND_TITLE, longDate, type LetterKind, type LetterStatus } from "@/lib/letters";
+import { durationText, isHireKind, KIND_TITLE, longDate, salaryText, type LetterKind, type LetterStatus } from "@/lib/letters";
 import { BODY, BRAND, INK, LINE, LOGO, SOFT } from "./brand";
 
 type Img = { data: Buffer; format: "png" | "jpg" };
@@ -13,6 +13,10 @@ export type LetterPdfData = {
   full_name: string;
   emp_code: string;
   designation: string;
+  department?: string | null;
+  date_from?: string | null;
+  date_to?: string | null;
+  salary?: number | null;
   company_name: string;
   body: string;
   cancelled_at: string | null;
@@ -47,12 +51,32 @@ const s = StyleSheet.create({
   verifyTitle: { fontSize: 8.5, fontWeight: 700 },
   verifyText: { fontSize: 7.5, color: BODY, marginTop: 2, lineHeight: 1.4 },
   watermark: { position: "absolute", top: 360, left: 0, right: 0, textAlign: "center", fontSize: 92, fontWeight: 800, letterSpacing: 6, transform: "rotate(-30deg)" },
+  terms: { marginTop: 18, borderWidth: 1, borderColor: LINE, borderRadius: 10, overflow: "hidden" },
+  termsRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: LINE },
+  termsKey: { width: 150, backgroundColor: SOFT, paddingVertical: 7, paddingHorizontal: 12, fontSize: 9, color: BODY, fontWeight: 600 },
+  termsVal: { flex: 1, paddingVertical: 7, paddingHorizontal: 12, fontSize: 10, fontWeight: 700 },
+  accept: { marginTop: 26, paddingTop: 12, borderTopWidth: 1, borderTopColor: LINE, borderStyle: "dashed" },
+  acceptTitle: { fontSize: 8.5, fontWeight: 700, color: BODY, letterSpacing: 0.8, textTransform: "uppercase" },
+  acceptRow: { flexDirection: "row", gap: 24, marginTop: 26 },
+  acceptLine: { flex: 1, borderTopWidth: 1, borderTopColor: INK, paddingTop: 4, fontSize: 8.5, color: BODY },
   footer: { position: "absolute", bottom: 26, left: 56, right: 56, flexDirection: "row", justifyContent: "space-between", fontSize: 7.5, color: BODY, borderTopWidth: 1, borderTopColor: LINE, paddingTop: 8 },
 });
 
 export function LetterDocument({ l }: { l: LetterPdfData }) {
   const title = KIND_TITLE[l.kind];
   const paras = l.body.split(/\n\s*\n/).map((p) => p.replace(/\s*\n\s*/g, " ").trim()).filter(Boolean);
+  const hire = isHireKind(l.kind);
+  const terms: [string, string][] = hire
+    ? [
+        ["Position", l.designation],
+        ...(l.department ? ([["Department", l.department]] as [string, string][]) : []),
+        [l.kind === "offer" ? "Joining date" : "Start date", longDate(l.date_from)],
+        ...(l.date_to ? ([["End date", longDate(l.date_to)]] as [string, string][]) : []),
+        ...(l.date_from && l.date_to ? ([["Duration", durationText(l.date_from, l.date_to, true)]] as [string, string][]) : []),
+        ["Monthly salary", salaryText(l.salary)],
+      ]
+    : [];
+  const salutation = l.kind === "offer" ? `Dear ${l.full_name},` : l.kind === "contract" ? null : "TO WHOM IT MAY CONCERN";
   const mark = l.status === "draft" ? { text: "DRAFT", color: "#f3d27a" } : l.status === "cancelled" ? { text: "CANCELLED", color: "#f4a3a8" } : null;
 
   return (
@@ -79,12 +103,27 @@ export function LetterDocument({ l }: { l: LetterPdfData }) {
           <Text style={s.eyebrow}>{l.company_name}</Text>
           <Text style={s.title}>{title}</Text>
 
-          <Text style={s.salutation}>TO WHOM IT MAY CONCERN</Text>
+          {l.kind === "contract" ? (
+            <View style={{ marginTop: 24 }} />
+          ) : (
+            <Text style={[s.salutation, l.kind === "offer" ? { letterSpacing: 0, fontWeight: 600 } : {}]}>{salutation}</Text>
+          )}
           {paras.map((p, i) => (
             <Text key={i} style={s.para}>
               {p}
             </Text>
           ))}
+
+          {terms.length > 0 && (
+            <View style={s.terms} wrap={false}>
+              {terms.map(([k, v], i) => (
+                <View key={k} style={[s.termsRow, i === terms.length - 1 ? { borderBottomWidth: 0 } : {}]}>
+                  <Text style={s.termsKey}>{k}</Text>
+                  <Text style={s.termsVal}>{v}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           <View style={s.signBlock} wrap={false}>
             <View>
@@ -115,6 +154,15 @@ export function LetterDocument({ l }: { l: LetterPdfData }) {
               </View>
             </View>
           </View>
+          {hire && (
+            <View style={s.accept} wrap={false}>
+              <Text style={s.acceptTitle}>{l.kind === "offer" ? "Acceptance of offer" : "Agreed and accepted"}</Text>
+              <View style={s.acceptRow}>
+                <Text style={s.acceptLine}>{l.full_name} (signature)</Text>
+                <Text style={[s.acceptLine, { flex: 0.6 }]}>Date</Text>
+              </View>
+            </View>
+          )}
         </View>
 
         <View style={s.footer} fixed>

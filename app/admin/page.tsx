@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowUpRight, BriefcaseBusiness, CalendarClock, ClipboardCheck, Palmtree, UserX, Users } from "lucide-react";
+import { ArrowUpRight, BriefcaseBusiness, CalendarClock, ClipboardCheck, FileSignature, Palmtree, UserX, Users } from "lucide-react";
 import { BarChart } from "@/components/charts/bar-chart";
 import { BarList, ChartCard, Headline } from "@/components/charts/chart-card";
 import { SERIES, formatValue } from "@/components/charts/chart-utils";
 import { LineChart } from "@/components/charts/line-chart";
 import { PageHeader, StatTile } from "@/components/ui/misc";
 import { requireRole } from "@/lib/auth";
-import { formatDate, formatINR } from "@/lib/format";
+import { formatDate, formatINR, todayIST } from "@/lib/format";
+import { daysUntil } from "@/lib/letters";
 import { monthTitle } from "@/lib/payroll";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -33,10 +34,24 @@ const sum = (xs: number[]) => xs.reduce((a, b) => a + Number(b), 0);
 
 export default async function AdminDashboard() {
   const { supabase, profile } = await requireRole("admin");
-  const [{ data, error }, { count: fixCount }] = await Promise.all([
+  const [{ data, error }, { count: fixCount }, { data: contractRows }] = await Promise.all([
     supabase.rpc("admin_dashboard"),
     supabase.from("clockout_fix_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    supabase
+      .from("letters")
+      .select("employee_id, date_from, date_to, profiles!letters_employee_id_fkey(full_name, is_active)")
+      .eq("kind", "contract")
+      .eq("status", "issued")
+      .gte("date_to", todayIST()),
   ]);
+  // Contracts that end within 30 days and have not been renewed yet.
+  const today0 = todayIST();
+  type CRow = { employee_id: string; date_from: string; date_to: string; profiles: { full_name: string; is_active: boolean } | null };
+  const cRows = (contractRows ?? []) as unknown as CRow[];
+  const ending = cRows
+    .filter((c) => c.profiles?.is_active && c.date_from <= today0 && daysUntil(today0, c.date_to) <= 30)
+    .filter((c) => !cRows.some((o) => o.employee_id === c.employee_id && o.date_from > c.date_to))
+    .sort((a, b) => a.date_to.localeCompare(b.date_to));
   const fixes = fixCount ?? 0;
   const d = data as Dashboard | null;
 
@@ -106,6 +121,31 @@ export default async function AdminDashboard() {
           />
         </Link>
       </div>
+
+      {ending.length > 0 && (
+        <section aria-label="Contracts ending soon" className="card mt-6 p-5 sm:p-6">
+          <div className="flex items-center gap-2">
+            <FileSignature className="h-[18px] w-[18px] text-warning" />
+            <h2 className="text-base font-bold tracking-[-0.01em] text-ink">Contracts ending soon</h2>
+          </div>
+          <p className="mt-0.5 text-sm text-body">Renew them from the employee&apos;s page, or record their exit.</p>
+          <ul className="mt-3 divide-y divide-line">
+            {ending.map((c) => {
+              const n = daysUntil(today0, c.date_to);
+              return (
+                <li key={c.employee_id + c.date_to}>
+                  <Link href={`/admin/employees/${c.employee_id}#contract`} className="flex items-center justify-between gap-3 py-2.5 text-sm hover:text-brand">
+                    <span className="font-semibold text-ink">{c.profiles?.full_name}</span>
+                    <span className={n <= 7 ? "font-semibold text-warning" : "text-body"}>
+                      {formatDate(c.date_to)} · {n === 0 ? "today" : `in ${n} day${n === 1 ? "" : "s"}`}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {/* ---------- Attendance ---------- */}
       <div className="mt-6 grid gap-6 xl:grid-cols-3">
