@@ -20,7 +20,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   const { month: m } = await searchParams;
   const month = m && /^\d{4}-(0[1-9]|1[0-2])$/.test(m) && m <= today.slice(0, 7) ? m : today.slice(0, 7);
 
-  const [{ data }, { data: reqs }, { data: settings }] = await Promise.all([
+  const [{ data }, { data: reqs }, { data: shift }] = await Promise.all([
     supabase.rpc("employee_month", { p_employee: profile.id, p_month: `${month}-01` }),
     supabase
       .from("clockout_fix_requests")
@@ -29,7 +29,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
       .gte("work_date", `${month}-01`)
       .lt("work_date", nextMonth(month))
       .order("created_at", { ascending: false }),
-    supabase.from("settings").select("work_end").single(),
+    supabase.rpc("my_shift"),
   ]);
   // newest request per day first, so .find() picks the latest
   const requests = (reqs ?? []) as FixRequest[];
@@ -50,7 +50,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
         <StatTile label="Absent" value={absent} sub="Working days with no clock-in" tone="brand" />
       </div>
       <div className="mt-6">
-        <AttendanceMonth days={days} month={month} today={today} requests={requests} workEnd={String(settings?.work_end ?? "17:00").slice(0, 5)} />
+        <AttendanceMonth days={days} month={month} today={today} requests={requests} workEnd={(shift as { end?: string } | null)?.end ?? "17:00"} />
       </div>
     </>
   );

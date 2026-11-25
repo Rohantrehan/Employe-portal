@@ -44,7 +44,7 @@ export function SettingsForm({ initial }: { initial: Settings }) {
           <CardHeader title="Office hours" description="Monday to Saturday. Sunday is the weekly off." />
           <CardBody className="grid gap-4 sm:grid-cols-2">
             <Input label="Opens at" name="work_start" type="time" value={v.work_start} onChange={set("work_start")} required />
-            <Input label="Closes at" name="work_end" type="time" value={v.work_end} onChange={set("work_end")} required hint="Leaving before this is marked “early leave”." />
+            <Input label="Closes at" name="work_end" type="time" value={v.work_end} onChange={set("work_end")} required hint="Leaving before this is marked “early leave”. Anyone with custom hours on their profile uses those instead." />
           </CardBody>
         </Card>
 

@@ -9,7 +9,14 @@ const optionalText = (max: number) =>
     .nullable()
     .optional();
 
-export const employeeSchema = z.object({
+const hhmm = z
+  .string()
+  .regex(/^$|^([01]\d|2[0-3]):[0-5]\d(:00)?$/, "Pick a time")
+  .transform((v) => (v === "" ? null : v.slice(0, 5)))
+  .nullable()
+  .optional();
+
+const baseSchema = z.object({
   full_name: z.string().trim().min(2, "Enter the full name").max(120),
   email: z.string().trim().toLowerCase().email("Enter a valid email address"),
   emp_code: z
@@ -43,7 +50,15 @@ export const employeeSchema = z.object({
     .optional(),
   basic_salary: z.coerce.number({ message: "Enter an amount" }).min(0, "Cannot be negative").max(100_000_000, "Too large"),
   role: z.enum(["employee", "admin"]).default("employee"),
+  schedule: z.enum(["standard", "custom", "none"]).default("standard"),
+  shift_start: hhmm,
+  shift_end: hhmm,
 });
+
+export const employeeSchema = baseSchema
+  .refine((v) => v.schedule !== "custom" || !!v.shift_start, { message: "Pick a start time", path: ["shift_start"] })
+  .refine((v) => v.schedule !== "custom" || !!v.shift_end, { message: "Pick an end time", path: ["shift_end"] })
+  .refine((v) => v.schedule !== "custom" || v.shift_start !== v.shift_end, { message: "Start and end can't be the same", path: ["shift_end"] });
 
 export type EmployeeInput = z.infer<typeof employeeSchema>;
 

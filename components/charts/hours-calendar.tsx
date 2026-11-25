@@ -55,6 +55,7 @@ export function HoursCalendar({ days, today }: { days: CalendarDay[]; today: str
           if (d.day_kind === "holiday") tag = "Hol";
           else if (d.day_kind === "weekly_off") tag = "Off";
           else if (leave) tag = "Leave";
+          else if (d.day_kind === "untracked" && !d.clock_in) tag = "—";
           else if (open) tag = "Now";
           else if (absent) tag = "Absent";
 
@@ -62,7 +63,7 @@ export function HoursCalendar({ days, today }: { days: CalendarDay[]; today: str
             ? `${formatDuration(mins)} worked${d.is_late ? " · late" : ""}`
             : open
               ? "Clocked in, day in progress"
-              : d.day_label ?? (absent ? "No attendance" : future ? "Upcoming" : "Working day");
+              : d.day_label ?? (absent ? "No attendance" : d.day_kind === "untracked" ? "Attendance not tracked" : future ? "Upcoming" : "Working day");
 
           return (
             <div

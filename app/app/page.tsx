@@ -8,7 +8,7 @@ import { HoursCalendar } from "@/components/charts/hours-calendar";
 import { PageHeader, StatTile } from "@/components/ui/misc";
 import { requireRole } from "@/lib/auth";
 import { formatDate, todayIST } from "@/lib/format";
-import { formatDuration, type DayKind, type DayRecord } from "@/lib/attendance";
+import { formatDuration, type DayKind, type DayRecord, type MyShift } from "@/lib/attendance";
 import { daysBetween, monthName, weekday } from "@/lib/holidays";
 import { formatDays, remaining, total, type Balance } from "@/lib/leave";
 import { ClockoutFix, type FixRequest } from "@/components/attendance/clockout-fix";
@@ -26,7 +26,7 @@ function greeting() {
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 }
 
-const PLACEHOLDER: Partial<Record<DayKind, string>> = { weekly_off: "Off", holiday: "Hol", leave: "Leave" };
+const PLACEHOLDER: Partial<Record<DayKind, string>> = { weekly_off: "Off", holiday: "Hol", leave: "Leave", untracked: "—" };
 const PENDING_HATCH = "repeating-linear-gradient(45deg, #9ca3af 0 3px, #e5e7eb 3px 6px)";
 
 export default async function EmployeeDashboard() {
@@ -36,9 +36,9 @@ export default async function EmployeeDashboard() {
   const monthStart = today.slice(0, 8) + "01";
 
   const since = new Date(Date.parse(today + "T00:00:00Z") - 30 * 86_400_000).toISOString().slice(0, 10);
-  const [{ data: month }, { data: settings }, { data: mine }, { data: balances }, { data: types }, { data: missedRows }, { data: fixReqs }] = await Promise.all([
+  const [{ data: month }, { data: shiftData }, { data: mine }, { data: balances }, { data: types }, { data: missedRows }, { data: fixReqs }] = await Promise.all([
     supabase.rpc("employee_month", { p_employee: profile.id, p_month: monthStart }),
-    supabase.from("settings").select("work_start, work_end").single(),
+    supabase.rpc("my_shift"),
     supabase.rpc("my_dashboard", { p_days: 14 }),
     supabase.from("leave_balances").select("leave_type_id, allotted, carried, used, pending").eq("employee_id", profile.id).eq("year", year),
     supabase.from("leave_types").select("id, name, tracks_balance, is_active, sort_order").eq("is_active", true).eq("tracks_balance", true).order("sort_order"),
@@ -66,19 +66,26 @@ export default async function EmployeeDashboard() {
   const requests = (fixReqs ?? []) as FixRequest[];
 
   const days = (month ?? []) as (DayRecord & { day: string })[];
-  const todayRec = days.find((d) => d.day === today);
+  const shift = shiftData as MyShift;
+  // A night shift that started yesterday is still "today" until it ends.
+  const workDay = shift?.day ?? today;
+  let todayRec = days.find((d) => d.day === workDay);
+  if (!todayRec && workDay < monthStart) {
+    const { data: prev } = await supabase.rpc("employee_month", { p_employee: profile.id, p_month: workDay.slice(0, 8) + "01" });
+    todayRec = ((prev ?? []) as (DayRecord & { day: string })[]).find((d) => d.day === workDay);
+  }
   const past = days.filter((d) => d.day <= today);
   const workedDays = past.filter((d) => d.clock_in);
   const totalMins = workedDays.reduce((s, d) => s + (d.worked_minutes ?? 0), 0);
   const closedDays = workedDays.filter((d) => d.worked_minutes != null);
   const lateCount = workedDays.filter((d) => d.is_late).length;
-  const hhmm = (t?: string) => (t ?? "").slice(0, 5);
 
   const m = mine as Mine | null;
   const recent = m?.recent ?? [];
   const recentWorked = recent.filter((r) => !r.open && r.minutes != null);
   const recentAvg = recentWorked.length ? recentWorked.reduce((s, r) => s + (r.minutes ?? 0), 0) / recentWorked.length : null;
-  const metTarget = recentWorked.filter((r) => (r.minutes ?? 0) >= 480).length;
+  const targetMins = shift?.tracked && shift.minutes > 0 ? shift.minutes : 480;
+  const metTarget = recentWorked.filter((r) => (r.minutes ?? 0) >= targetMins).length;
   const next = m?.next_holiday ?? null;
   const nextIn = next ? daysBetween(today, next.day) : null;
 
@@ -88,6 +95,35 @@ export default async function EmployeeDashboard() {
       return b ? { name: t.name, total: total(b), used: Number(b.used), pending: Number(b.pending), left: remaining(b) } : null;
     })
     .filter((x): x is NonNullable<typeof x> => !!x);
+
+  const tracked = shift?.tracked !== false;
+  const nextHolidayCard = (
+    <section className="card relative flex flex-col overflow-hidden bg-rail p-6 text-white">
+      <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-brand/30 blur-3xl" aria-hidden />
+      <div className="relative flex items-center justify-between">
+        <p className="text-[12px] font-bold uppercase tracking-[0.14em] text-white/60">Next holiday</p>
+        <span className="grid h-9 w-9 place-items-center rounded-full bg-white/10">
+          <CalendarHeart className="h-[18px] w-[18px]" />
+        </span>
+      </div>
+      {next ? (
+        <div className="relative mt-auto pt-10">
+          <p className="text-[44px] font-extrabold leading-none tracking-[-0.04em]">
+            {nextIn === 0 ? "Today" : nextIn === 1 ? "Tomorrow" : `${nextIn} days`}
+          </p>
+          <p className="mt-3 text-lg font-bold">{next.label}</p>
+          <p className="text-rail-text">
+            {weekday(next.day, "long")}, {formatDate(next.day)}
+          </p>
+          <Link href="/app/holidays" className="mt-5 inline-flex items-center gap-1 text-[13px] font-semibold text-white/80 hover:text-white">
+            Holiday list <ArrowUpRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      ) : (
+        <p className="relative mt-auto pt-10 text-rail-text">No holidays in the next 12 months yet.</p>
+      )}
+    </section>
+  );
 
   return (
     <>
@@ -117,34 +153,37 @@ export default async function EmployeeDashboard() {
           <p className="mt-0.5 text-sm text-body">Those hours don&apos;t count until it&apos;s fixed. Send your leaving time to your admin.</p>
           <div className="mt-4 space-y-2.5">
             {missed.map((d) => (
-              <ClockoutFix key={d.attendance_id} day={d} compact request={requests.find((r) => r.attendance_id === d.attendance_id)} workEnd={hhmm(settings?.work_end)} />
+              <ClockoutFix key={d.attendance_id} day={d} compact request={requests.find((r) => r.attendance_id === d.attendance_id)} workEnd={shift?.end} />
             ))}
           </div>
         </section>
       )}
 
       <div className={missed.length ? "mt-6" : "mt-8"}>
-        {todayRec && <ClockCard today={todayRec} workStart={hhmm(settings?.work_start)} workEnd={hhmm(settings?.work_end)} />}
+        {todayRec && shift && <ClockCard today={todayRec} shift={shift} isNightBefore={workDay < today} />}
       </div>
 
+      {tracked && (
       <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatTile label="Days worked" value={workedDays.length} sub="This month" icon={<CalendarCheck />} tone="success" />
         <StatTile label="Hours this month" value={formatDuration(totalMins)} sub="Closed days only" icon={<Clock3 />} tone="dark" />
         <StatTile
           label="Average day"
           value={closedDays.length ? formatDuration(Math.round(totalMins / closedDays.length)) : "—"}
-          sub="Target 8h 00m"
+          sub={`Target ${formatDuration(targetMins)}`}
           icon={<Hourglass />}
           tone="info"
         />
         <StatTile label="Late arrivals" value={lateCount} sub="This month" icon={<TimerReset />} tone={lateCount ? "warning" : "brand"} />
       </div>
+      )}
 
       <div className="mt-6 grid gap-6 xl:grid-cols-3">
+        {tracked && (
         <ChartCard
           className="xl:col-span-2"
           title="Hours, last 14 days"
-          description="Time worked each day against the 8-hour target"
+          description={`Time worked each day against your ${formatDuration(targetMins).replace(" 00m", "")} target`}
           headline={
             <Headline
               value={recentAvg != null ? formatDuration(Math.round(recentAvg)) : "—"}
@@ -164,7 +203,7 @@ export default async function EmployeeDashboard() {
             label="Hours worked per day over the last 14 days"
             unit="hours"
             color={BLUE_RAMP[2]}
-            target={{ value: 8, label: "8h target" }}
+            target={{ value: targetMins / 60, label: `${formatDuration(targetMins).replace(" 00m", "")} target` }}
             data={recent.map((r) => ({
               label: `${weekday(r.day, "long")}, ${formatDate(r.day)}`,
               short: `${weekday(r.day).slice(0, 2)} ${Number(r.day.slice(8))}`,
@@ -179,8 +218,10 @@ export default async function EmployeeDashboard() {
             }))}
           />
         </ChartCard>
+        )}
 
         <ChartCard
+          className={tracked ? undefined : "xl:col-span-2"}
           title={`Leave balance ${year}`}
           description="Used, pending and left per leave type"
           action={
@@ -225,8 +266,10 @@ export default async function EmployeeDashboard() {
             <p className="py-10 text-center text-sm text-body">No leave balances for {year} yet.</p>
           )}
         </ChartCard>
+        {!tracked && nextHolidayCard}
       </div>
 
+      {tracked && (
       <div className="mt-6 grid gap-6 xl:grid-cols-3">
         <ChartCard
           className="xl:col-span-2"
@@ -241,32 +284,9 @@ export default async function EmployeeDashboard() {
           <HoursCalendar days={days} today={today} />
         </ChartCard>
 
-        <section className="card relative flex flex-col overflow-hidden bg-rail p-6 text-white">
-          <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-brand/30 blur-3xl" aria-hidden />
-          <div className="relative flex items-center justify-between">
-            <p className="text-[12px] font-bold uppercase tracking-[0.14em] text-white/60">Next holiday</p>
-            <span className="grid h-9 w-9 place-items-center rounded-full bg-white/10">
-              <CalendarHeart className="h-[18px] w-[18px]" />
-            </span>
-          </div>
-          {next ? (
-            <div className="relative mt-auto pt-10">
-              <p className="text-[44px] font-extrabold leading-none tracking-[-0.04em]">
-                {nextIn === 0 ? "Today" : nextIn === 1 ? "Tomorrow" : `${nextIn} days`}
-              </p>
-              <p className="mt-3 text-lg font-bold">{next.label}</p>
-              <p className="text-rail-text">
-                {weekday(next.day, "long")}, {formatDate(next.day)}
-              </p>
-              <Link href="/app/holidays" className="mt-5 inline-flex items-center gap-1 text-[13px] font-semibold text-white/80 hover:text-white">
-                Holiday list <ArrowUpRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-          ) : (
-            <p className="relative mt-auto pt-10 text-rail-text">No holidays in the next 12 months yet.</p>
-          )}
-        </section>
+        {nextHolidayCard}
       </div>
+      )}
 
     </>
   );

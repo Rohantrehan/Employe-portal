@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Input, Select } from "@/components/ui/field";
+import type { Schedule } from "@/lib/attendance";
 
 export type Department = { id: string; name: string };
 export type EmployeeDefaults = {
@@ -13,6 +15,9 @@ export type EmployeeDefaults = {
   date_of_joining?: string | null;
   basic_salary?: number | null;
   role?: "employee" | "admin";
+  schedule?: Schedule | null;
+  shift_start?: string | null;
+  shift_end?: string | null;
 };
 
 /** The shared set of inputs for creating and editing an employee. */
@@ -29,6 +34,11 @@ export function EmployeeFields({
   isEdit?: boolean;
   lockRole?: boolean;
 }) {
+  const [schedule, setSchedule] = useState<Schedule>(defaults.schedule ?? "standard");
+  const [start, setStart] = useState((defaults.shift_start ?? "").slice(0, 5));
+  const [end, setEnd] = useState((defaults.shift_end ?? "").slice(0, 5));
+  const overnight = schedule === "custom" && !!start && !!end && end < start;
+
   return (
     <div className="grid gap-5 sm:grid-cols-2">
       <Input label="Full name" name="full_name" defaultValue={defaults.full_name} required autoComplete="off" error={errors.full_name} />
@@ -84,6 +94,45 @@ export function EmployeeFields({
         <option value="admin">Admin</option>
       </Select>
       {lockRole && <input type="hidden" name="role" value={defaults.role ?? "admin"} />}
+
+      <fieldset className="grid gap-5 border-t border-line pt-5 sm:col-span-2 sm:grid-cols-2">
+        <legend className="sr-only">Working hours</legend>
+        <Select
+          label="Working hours"
+          name="schedule"
+          value={schedule}
+          onChange={(e) => setSchedule(e.target.value as Schedule)}
+          hint={
+            schedule === "standard"
+              ? "Uses the office hours from Settings."
+              : schedule === "custom"
+                ? "Late and early leave are checked against these hours."
+                : "No clock-in. Never marked late or absent. Leave still works."
+          }
+          error={errors.schedule}
+        >
+          <option value="standard">Company hours</option>
+          <option value="custom">Custom hours</option>
+          <option value="none">Attendance not tracked</option>
+        </Select>
+        {schedule === "custom" ? (
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Starts" name="shift_start" type="time" value={start} onChange={(e) => setStart(e.target.value)} required error={errors.shift_start} />
+            <Input
+              label="Ends"
+              name="shift_end"
+              type="time"
+              value={end}
+              onChange={(e) => setEnd(e.target.value)}
+              required
+              hint={overnight ? "Night shift: ends the next morning. It counts for the day it starts." : undefined}
+              error={errors.shift_end}
+            />
+          </div>
+        ) : (
+          <div aria-hidden className="hidden sm:block" />
+        )}
+      </fieldset>
     </div>
   );
 }

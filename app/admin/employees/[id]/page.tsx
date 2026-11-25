@@ -21,7 +21,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
   const [{ data: emp }, { data: departments }, { data: balances }, { data: exit }, { data: letters }, { data: events }, { data: settings }, { count: signatures }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, emp_code, full_name, email, phone, designation, department_id, date_of_joining, basic_salary, role, is_active, must_change_password, avatar_url, created_at, left_on, former_access, departments(name)")
+      .select("id, emp_code, full_name, email, phone, designation, department_id, date_of_joining, basic_salary, role, schedule, shift_start, shift_end, is_active, must_change_password, avatar_url, created_at, left_on, former_access, departments(name)")
       .eq("id", id)
       .maybeSingle(),
     supabase.from("departments").select("id, name").order("name"),
@@ -117,6 +117,9 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
             date_of_joining: emp.date_of_joining,
             basic_salary: Number(emp.basic_salary),
             role: emp.role,
+            schedule: emp.schedule,
+            shift_start: emp.shift_start,
+            shift_end: emp.shift_end,
           }}
         />
         <div id="exit">

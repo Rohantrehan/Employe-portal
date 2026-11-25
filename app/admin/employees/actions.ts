@@ -63,6 +63,9 @@ export async function createEmployee(
       date_of_joining: input.date_of_joining ?? null,
       basic_salary: input.basic_salary,
       role: input.role,
+      schedule: input.schedule,
+      shift_start: input.schedule === "custom" ? input.shift_start : null,
+      shift_end: input.schedule === "custom" ? input.shift_end : null,
       must_change_password: true,
       ...(input.emp_code ? { emp_code: input.emp_code } : {}),
     })
@@ -123,6 +126,9 @@ export async function updateEmployee(id: string, _prev: ActionResult | undefined
       date_of_joining: input.date_of_joining ?? null,
       basic_salary: input.basic_salary,
       role: input.role,
+      schedule: input.schedule,
+      shift_start: input.schedule === "custom" ? input.shift_start : null,
+      shift_end: input.schedule === "custom" ? input.shift_end : null,
       ...(input.emp_code ? { emp_code: input.emp_code } : {}),
     })
     .eq("id", id);

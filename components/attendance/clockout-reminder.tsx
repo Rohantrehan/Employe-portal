@@ -6,40 +6,30 @@ import { usePathname } from "next/navigation";
 import { AlarmClock, X } from "lucide-react";
 import { formatTime } from "@/lib/attendance";
 
-const TZ = "Asia/Kolkata";
 const SNOOZE_MS = 30 * 60 * 1000;
-
-/** Minutes since midnight and the date, both in IST. */
-function nowIST() {
-  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
-  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "0";
-  return { minutes: Number(get("hour")) * 60 + Number(get("minute")), date: `${get("year")}-${get("month")}-${get("day")}` };
-}
 
 /**
  * Banner shown on every employee page when they are still clocked in
- * 15 minutes after the office closes. Re-checks every 30 s; "Later" snoozes it for 30 minutes.
+ * 15 minutes after their shift ends (the next morning for a night shift). Re-checks every 30 s; "Later" snoozes it for 30 minutes.
  */
-export function ClockOutReminder({ date, clockIn, workEnd }: { date: string; clockIn: string; workEnd: string }) {
+export function ClockOutReminder({ date, clockIn, workEnd, endsAt }: { date: string; clockIn: string; workEnd: string; endsAt: string }) {
   const pathname = usePathname();
   const key = `clockout-reminder-snooze:${date}`;
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    const [h, m] = workEnd.split(":").map(Number);
-    const due = h * 60 + m + 15;
+    const due = new Date(endsAt).getTime() + 15 * 60_000;
     const tick = () => {
-      const n = nowIST();
       let snoozed = 0;
       try {
         snoozed = Number(localStorage.getItem(key) ?? 0);
       } catch {}
-      setShow(n.date === date && n.minutes >= due && Date.now() > snoozed);
+      setShow(Date.now() >= due && Date.now() > snoozed);
     };
     tick();
     const id = setInterval(tick, 30_000);
     return () => clearInterval(id);
-  }, [date, workEnd, key]);
+  }, [endsAt, key]);
 
   if (!show) return null;
 
@@ -58,7 +48,7 @@ export function ClockOutReminder({ date, clockIn, workEnd }: { date: string; clo
       <div className="min-w-0 flex-1 basis-[200px] text-sm">
         <p className="font-bold">You&apos;re still clocked in</p>
         <p className="text-rail-text">
-          Since {formatTime(clockIn)}. The office closed at {workEnd}. Clock out before you leave so today counts.
+          Since {formatTime(clockIn)}. Your shift ended at {workEnd}. Clock out before you leave so today counts.
         </p>
       </div>
       <div className="flex w-full items-center justify-end gap-2 sm:w-auto">

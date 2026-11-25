@@ -13,7 +13,7 @@ import { Modal } from "@/components/ui/modal";
 import { Avatar, EmptyState } from "@/components/ui/misc";
 import { Tabs } from "@/components/ui/tabs";
 import { TaskChecklist } from "@/components/attendance/task-checklist";
-import { dayBadge, formatDuration, formatTime, minutesSince, toTimeInput } from "@/lib/attendance";
+import { dayBadge, formatDuration, formatTime, minutesSince, shiftText, toTimeInput } from "@/lib/attendance";
 import { formatDate } from "@/lib/format";
 import { saveAttendance } from "./actions";
 import type { TeamRow } from "./page";
@@ -133,6 +133,9 @@ function PersonCard({ r, isToday, onEdit }: { r: TeamRow; isToday: boolean; onEd
             {r.full_name}
           </Link>
           <p className="truncate text-[13px] text-body">{r.designation ?? r.department ?? r.emp_code}</p>
+          <p className="truncate text-[12px] tabular-nums text-body/80">
+            {r.day_kind === "untracked" ? "Attendance not tracked" : `Hours ${shiftText(r.shift_start, r.shift_end, true)}`}
+          </p>
         </div>
         <Badge tone={b.tone} dot={!!open}>
           {b.label}
@@ -168,7 +171,9 @@ function PersonCard({ r, isToday, onEdit }: { r: TeamRow; isToday: boolean; onEd
         </>
       ) : (
         <p className="mt-4 text-sm text-body">
-          {r.day_kind === "working" || r.day_kind === "half_leave"
+          {r.day_kind === "untracked"
+            ? "No clock-in needed."
+            : r.day_kind === "working" || r.day_kind === "half_leave"
             ? isToday
               ? "Hasn't clocked in yet."
               : "No attendance recorded."
@@ -193,7 +198,7 @@ function PersonCard({ r, isToday, onEdit }: { r: TeamRow; isToday: boolean; onEd
 function EditAttendanceModal({ row, date, onClose }: { row: TeamRow; date: string; onClose: () => void }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [clockIn, setClockIn] = useState(toTimeInput(row.clock_in) || "09:00");
+  const [clockIn, setClockIn] = useState(toTimeInput(row.clock_in) || row.shift_start || "09:00");
   const [clockOut, setClockOut] = useState(toTimeInput(row.clock_out));
   const [note, setNote] = useState(row.admin_note ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -228,7 +233,7 @@ function EditAttendanceModal({ row, date, onClose }: { row: TeamRow; date: strin
       {error && <p role="alert" className="mb-4 rounded-2xl bg-tint-2 px-4 py-3 text-sm font-medium text-brand">{error}</p>}
       <div className="grid gap-4 sm:grid-cols-2">
         <Input label="Clock in" type="time" value={clockIn} onChange={(e) => setClockIn(e.target.value)} required />
-        <Input label="Clock out" type="time" value={clockOut} onChange={(e) => setClockOut(e.target.value)} hint="Leave empty if still working." />
+        <Input label="Clock out" type="time" value={clockOut} onChange={(e) => setClockOut(e.target.value)} hint={row.overnight ? "Night shift: a time earlier than clock-in means the next morning. Leave empty if still working." : "Leave empty if still working."} />
       </div>
       <Textarea
         wrapperClassName="mt-4"

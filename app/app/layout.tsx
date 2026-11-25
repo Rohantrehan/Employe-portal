@@ -1,20 +1,19 @@
 import { ClockOutReminder } from "@/components/attendance/clockout-reminder";
 import { AppShell } from "@/components/layout/app-shell";
 import { requireRole } from "@/lib/auth";
-import { todayIST } from "@/lib/format";
+import type { MyShift } from "@/lib/attendance";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function EmployeeLayout({ children }: { children: React.ReactNode }) {
-  const today = todayIST();
   const supabase = await createClient();
-  // RLS returns only this employee's rows, so this can run alongside the role check.
-  const [{ profile }, { data: open }, { data: settings }] = await Promise.all([
-    requireRole("employee"),
-    supabase.from("attendance").select("clock_in").eq("work_date", today).is("clock_out", null).neq("status", "missed_clock_out").maybeSingle(),
-    supabase.from("settings").select("work_end").single(),
-  ]);
+  const [{ profile }, { data: shiftData }] = await Promise.all([requireRole("employee"), supabase.rpc("my_shift")]);
+  const shift = shiftData as MyShift | null;
+  // RLS returns only this employee's rows. A night shift keeps the date it started on.
+  const { data: open } = shift?.tracked
+    ? await supabase.from("attendance").select("clock_in").eq("work_date", shift.day).is("clock_out", null).neq("status", "missed_clock_out").maybeSingle()
+    : { data: null };
 
   return (
     <AppShell
@@ -26,7 +25,7 @@ export default async function EmployeeLayout({ children }: { children: React.Rea
         subtitle: profile.designation ?? profile.emp_code,
       }}
     >
-      {open?.clock_in && <ClockOutReminder date={today} clockIn={open.clock_in} workEnd={String(settings?.work_end ?? "17:00").slice(0, 5)} />}
+      {open?.clock_in && shift && <ClockOutReminder date={shift.day} clockIn={open.clock_in} workEnd={shift.end} endsAt={shift.ends_at} />}
       {children}
     </AppShell>
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowRight, CalendarHeart, CheckCircle2, Circle, Coffee, LogOut, Plane } from "lucide-react";
+import { AlertCircle, ArrowRight, CalendarHeart, CheckCircle2, Circle, Coffee, Film, LogOut, Plane } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,15 +11,35 @@ import { Textarea } from "@/components/ui/field";
 import { TaskListEditor } from "@/components/attendance/task-list-editor";
 import { TaskChecklist } from "@/components/attendance/task-checklist";
 import { cn } from "@/lib/cn";
-import { dayBadge, formatDuration, formatTime, minutesSince, type DayRecord } from "@/lib/attendance";
+import { dayBadge, formatDuration, formatTime, minutesSince, shiftText, type DayRecord, type MyShift } from "@/lib/attendance";
 import { clockInAction, clockOutAction } from "./attendance-actions";
 
-export function ClockCard({ today, workStart, workEnd }: { today: DayRecord; workStart: string; workEnd: string }) {
+export function ClockCard({ today, shift, isNightBefore }: { today: DayRecord; shift: MyShift; isNightBefore?: boolean }) {
   const off = !today.clock_in && (today.day_kind === "weekly_off" || today.day_kind === "holiday" || today.day_kind === "leave");
   if (off) return <OffDayCard today={today} />;
-  if (!today.clock_in) return <ClockInCard today={today} workStart={workStart} workEnd={workEnd} />;
-  if (!today.clock_out && today.status !== "missed_clock_out") return <WorkingCard today={today} workStart={workStart} workEnd={workEnd} />;
+  if (!today.clock_in && (today.day_kind === "untracked" || !shift.tracked)) return <UntrackedCard today={today} />;
+  if (!today.clock_in) return <ClockInCard today={today} shift={shift} isNightBefore={isNightBefore} />;
+  if (!today.clock_out && today.status !== "missed_clock_out") return <WorkingCard today={today} shift={shift} />;
   return <DoneCard today={today} />;
+}
+
+/* ------------------------------------------------------------------ */
+
+function UntrackedCard({ today }: { today: DayRecord }) {
+  return (
+    <div className="card animate-enter flex items-center gap-4 p-6">
+      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-info-tint text-info">
+        <Film className="h-6 w-6" />
+      </span>
+      <div>
+        <p className="text-lg font-extrabold tracking-[-0.02em] text-ink">No clock-in needed</p>
+        <p className="text-sm text-body">
+          Your attendance isn&apos;t tracked, so you&apos;re never marked late or absent. Leave requests still work as usual.
+          {today.day_label && <span className="font-semibold text-ink"> Today: {today.day_label}.</span>}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -44,7 +64,7 @@ function OffDayCard({ today }: { today: DayRecord }) {
 
 /* ------------------------------------------------------------------ */
 
-function ClockInCard({ today, workStart, workEnd }: { today: DayRecord; workStart: string; workEnd: string }) {
+function ClockInCard({ today, shift, isNightBefore }: { today: DayRecord; shift: MyShift; isNightBefore?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [tasks, setTasks] = useState<string[]>([""]);
@@ -72,7 +92,8 @@ function ClockInCard({ today, workStart, workEnd }: { today: DayRecord; workStar
             <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-white/60">Not clocked in yet</p>
             <p className="mt-2 text-[30px] font-extrabold leading-tight tracking-[-0.03em] sm:text-[36px]">Ready for today?</p>
             <p className="mt-1.5 max-w-md text-rail-text">
-              Write what you plan to finish, then clock in. Office hours are {workStart}–{workEnd}.
+              Write what you plan to finish, then clock in. Your hours are {shiftText(shift.start, shift.end)}.
+              {isNightBefore && <span className="text-white"> This is the shift that started last night.</span>}
               {today.day_kind === "half_leave" && <span className="text-white"> You have {today.day_label} today.</span>}
             </p>
           </div>
@@ -107,7 +128,7 @@ function ClockInCard({ today, workStart, workEnd }: { today: DayRecord; workStar
 
 /* ------------------------------------------------------------------ */
 
-function WorkingCard({ today, workStart, workEnd }: { today: DayRecord; workStart: string; workEnd: string }) {
+function WorkingCard({ today, shift: myShift }: { today: DayRecord; shift: MyShift }) {
   const router = useRouter();
   const [mins, setMins] = useState(() => minutesSince(today.clock_in!));
   const [open, setOpen] = useState(false);
@@ -118,8 +139,7 @@ function WorkingCard({ today, workStart, workEnd }: { today: DayRecord; workStar
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
-  const fullShift = toMin(workEnd) - toMin(workStart);
+  const fullShift = myShift.minutes;
   // On a half-day leave only half the shift is owed.
   const shift = today.day_kind === "half_leave" ? Math.floor(fullShift / 2) : fullShift;
   const clearAt = formatTime(new Date(new Date(today.clock_in!).getTime() + shift * 60_000).toISOString());
@@ -162,7 +182,7 @@ function WorkingCard({ today, workStart, workEnd }: { today: DayRecord; workStar
                 {today.is_late && <Badge tone="warning">Late</Badge>}
               </div>
               <p className="text-sm text-body">
-                Clocked in at <b className="text-ink">{formatTime(today.clock_in)}</b> · {formatDuration(mins)} so far · office closes at {workEnd}
+                Clocked in at <b className="text-ink">{formatTime(today.clock_in)}</b> · {formatDuration(mins)} so far · {myShift.overnight ? "shift ends" : "your day ends"} at {myShift.end}
               </p>
               {today.is_late && (
                 <p className="mt-1 text-sm text-body">

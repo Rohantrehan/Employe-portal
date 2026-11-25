@@ -18,9 +18,10 @@ const fixSchema = z
     note: z.string().trim().max(500, "Keep the note under 500 characters"),
   })
   .refine((v) => v.date <= todayIST(), { message: "Can't record attendance for a future date", path: ["date"] })
-  .refine((v) => !v.clockOut || v.clockOut > v.clockIn, { message: "Clock-out must be after clock-in", path: ["clockOut"] });
+  .refine((v) => v.clockOut !== v.clockIn, { message: "Clock-out must be after clock-in", path: ["clockOut"] });
 
 const ist = (date: string, hhmm: string) => `${date}T${hhmm}:00+05:30`;
+const nextDay = (date: string) => new Date(Date.parse(date + "T00:00:00Z") + 86_400_000).toISOString().slice(0, 10);
 
 /** Admin creates or corrects one attendance record. Status is recomputed by the DB trigger. */
 export async function saveAttendance(input: z.input<typeof fixSchema>): Promise<FixResult> {
@@ -29,9 +30,18 @@ export async function saveAttendance(input: z.input<typeof fixSchema>): Promise<
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
   const v = parsed.data;
 
+  // Night shift: a clock-out earlier than the clock-in is the next morning.
+  let outDate = v.date;
+  if (v.clockOut && v.clockOut < v.clockIn) {
+    const { data: emp } = await supabase.from("profiles").select("schedule, shift_start, shift_end").eq("id", v.employeeId).single();
+    const overnight = emp?.schedule === "custom" && !!emp.shift_start && !!emp.shift_end && emp.shift_end < emp.shift_start;
+    if (!overnight) return { ok: false, error: "Clock-out must be after clock-in" };
+    outDate = nextDay(v.date);
+  }
+
   const row = {
     clock_in: ist(v.date, v.clockIn),
-    clock_out: v.clockOut ? ist(v.date, v.clockOut) : null,
+    clock_out: v.clockOut ? ist(outDate, v.clockOut) : null,
     admin_note: v.note || null,
   };
 

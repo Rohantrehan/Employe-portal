@@ -17,6 +17,9 @@ export type TeamRow = DayRecord & {
   designation: string | null;
   avatar_url: string | null;
   department: string | null;
+  shift_start: string;
+  shift_end: string;
+  overnight: boolean;
 };
 
 export default async function TodayPage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {

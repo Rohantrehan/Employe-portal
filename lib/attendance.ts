@@ -1,6 +1,15 @@
 import type { BadgeTone } from "@/components/ui/badge";
 
-export type DayKind = "working" | "weekly_off" | "holiday" | "leave" | "half_leave";
+export type DayKind = "working" | "weekly_off" | "holiday" | "leave" | "half_leave" | "untracked";
+export type Schedule = "standard" | "custom" | "none";
+
+/** The hours that apply to the signed-in employee (from my_shift()). */
+export type MyShift = { tracked: boolean; start: string; end: string; minutes: number; overnight: boolean; day: string; ends_at: string };
+
+/** "09:00–17:00", "22:00–06:00 (next day)"; short: "22:00–06:00 night" */
+export function shiftText(start: string, end: string, short = false) {
+  return `${start}–${end}${end < start ? (short ? " night" : " (next day)") : ""}`;
+}
 export type AttendanceStatus = "present" | "late" | "half_day" | "missed_clock_out";
 export type Task = { id: string; title: string; planned: boolean; done: boolean };
 
@@ -71,6 +80,8 @@ export function dayBadge(d: Pick<DayRecord, "day_kind" | "day_label" | "status" 
       return { label: d.day_label ?? "On leave", tone: "info" };
     case "half_leave":
       return { label: d.day_label ?? "Half-day leave", tone: "info" };
+    case "untracked":
+      return d.day_label ? { label: d.day_label, tone: "info" } : { label: "Not tracked", tone: "neutral" };
     default:
       return isToday ? { label: "Not clocked in", tone: "neutral" } : { label: "Absent", tone: "brand" };
   }
