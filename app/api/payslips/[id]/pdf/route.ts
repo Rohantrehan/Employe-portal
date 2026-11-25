@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { data: slip } = await supabase
     .from("payslips")
     .select(
-      "id, month, working_days, present_days, leave_days, overtime_hours, basic_salary, performance_bonus, extra_pay, net_pay, status, payment_status, paid_on, payment_ref, published_at, profiles!payslips_employee_id_fkey(full_name, emp_code, email, designation, date_of_joining, departments(name))",
+      "id, month, working_days, present_days, leave_days, overtime_hours, late_days, basic_salary, excellence_bonus, rating, performance_bonus, night_shift_pay, remarks, net_pay, status, payment_status, paid_on, payment_ref, published_at, profiles!payslips_employee_id_fkey(full_name, emp_code, email, designation, date_of_joining, departments(name))",
     )
     .eq("id", id)
     .maybeSingle();
@@ -44,8 +44,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     leave_days: Number(slip.leave_days),
     overtime_hours: Number(slip.overtime_hours),
     basic_salary: Number(slip.basic_salary),
+    late_days: Number(slip.late_days ?? 0),
+    excellence_bonus: Number(slip.excellence_bonus),
+    rating: slip.rating == null ? null : Number(slip.rating),
     performance_bonus: Number(slip.performance_bonus),
-    extra_pay: Number(slip.extra_pay),
+    night_shift_pay: Number(slip.night_shift_pay),
     net_pay: Number(slip.net_pay),
     employee: {
       full_name: prof.full_name,

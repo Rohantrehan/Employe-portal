@@ -64,7 +64,7 @@ export default async function AdminOvertimePage({ searchParams }: { searchParams
       <PageHeader
         eyebrow="People"
         title="Extra hours"
-        description="Approve extra hours. Approved hours appear on payroll so you can set each person's Extra Pay."
+        description="Approve extra hours. Approved hours appear on payroll for reference when you set night shift pay or the rating."
         actions={
           <div className="flex items-center gap-2">
             <Link href={href(shiftMonth(month, -1))} className={navBtn} aria-label="Previous month">

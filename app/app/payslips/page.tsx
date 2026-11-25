@@ -9,7 +9,7 @@ import { MyLetters, type MyLetter } from "@/components/letters/my-letters";
 import { requireRole } from "@/lib/auth";
 import { formatDate, formatINR, todayIST } from "@/lib/format";
 import { formatHours } from "@/lib/overtime";
-import { monthTitle } from "@/lib/payroll";
+import { monthTitle, multiplierText, ratingInfo } from "@/lib/payroll";
 
 export const metadata: Metadata = { title: "Payslips" };
 
@@ -21,7 +21,7 @@ export default async function PayslipsPage() {
   const [{ data }, { data: letters }] = await Promise.all([
     supabase
       .from("payslips")
-      .select("id, month, working_days, present_days, leave_days, overtime_hours, basic_salary, performance_bonus, extra_pay, net_pay, payment_status, paid_on, payment_ref")
+      .select("id, month, working_days, present_days, leave_days, overtime_hours, basic_salary, excellence_bonus, rating, performance_bonus, night_shift_pay, remarks, net_pay, payment_status, paid_on, payment_ref")
       .eq("employee_id", profile.id)
       .order("month", { ascending: false }),
     // Letters are issued from the last working day, so they can show up here before the account switches to documents-only.
@@ -31,11 +31,14 @@ export default async function PayslipsPage() {
   const slips = (data ?? []).map((s) => ({
     ...s,
     basic_salary: Number(s.basic_salary),
+    excellence_bonus: Number(s.excellence_bonus),
+    rating: s.rating == null ? null : Number(s.rating),
     performance_bonus: Number(s.performance_bonus),
-    extra_pay: Number(s.extra_pay),
+    night_shift_pay: Number(s.night_shift_pay),
     net_pay: Number(s.net_pay),
   }));
   const latest = slips[0];
+  const latestRating = ratingInfo(latest?.rating);
   const yearTotal = slips.filter((s) => s.month.startsWith(year)).reduce((t, s) => t + s.net_pay, 0);
   const pdf = (id: string, view = false) => `/api/payslips/${id}/pdf${view ? "?view=1" : ""}`;
 
@@ -57,8 +60,16 @@ export default async function PayslipsPage() {
                 <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-white/60">Latest payslip · {monthTitle(latest.month)}</p>
                 <p className="mt-2 text-[40px] font-extrabold leading-none tracking-[-0.035em]">{formatINR(latest.net_pay)}</p>
                 <p className="mt-2 text-rail-text">
-                  Basic {formatINR(latest.basic_salary)} · Bonus {formatINR(latest.performance_bonus)} · Extra Pay {formatINR(latest.extra_pay)}
+                  Basic {formatINR(latest.basic_salary)}
+                  {latest.excellence_bonus > 0 && <> · Excellence {formatINR(latest.excellence_bonus)}</>} · Performance {formatINR(latest.performance_bonus)}
+                  {latest.night_shift_pay > 0 && <> · Night shift {formatINR(latest.night_shift_pay)}</>}
                 </p>
+                {latestRating && (
+                  <p className="mt-1 text-sm text-white/60">
+                    Rating {latestRating.value}/5 · {multiplierText(latestRating.multiplier)} ({latestRating.label.toLowerCase()})
+                  </p>
+                )}
+                {latest.remarks && <p className="mt-2 max-w-xl whitespace-pre-line text-sm text-white/80">“{latest.remarks}”</p>}
                 <div className="mt-3">
                   {latest.payment_status === "paid" ? (
                     <Badge tone="success" dot>
@@ -105,8 +116,9 @@ export default async function PayslipsPage() {
                 <tr>
                   <TH>Month</TH>
                   <TH className="text-right">Basic</TH>
-                  <TH className="text-right">Bonus</TH>
-                  <TH className="text-right">Extra Pay</TH>
+                  <TH className="text-right">Excellence</TH>
+                  <TH className="text-right">Performance</TH>
+                  <TH className="text-right">Night shift</TH>
                   <TH className="text-right">Net pay</TH>
                   <TH>Payment</TH>
                   <TH />
@@ -117,8 +129,12 @@ export default async function PayslipsPage() {
                   <TR key={s.id}>
                     <TD className="font-semibold">{monthTitle(s.month)}</TD>
                     <TD className="text-right tabular-nums text-body">{formatINR(s.basic_salary)}</TD>
-                    <TD className="text-right tabular-nums text-body">{formatINR(s.performance_bonus)}</TD>
-                    <TD className="text-right tabular-nums text-body">{formatINR(s.extra_pay)}</TD>
+                    <TD className="text-right tabular-nums text-body">{formatINR(s.excellence_bonus)}</TD>
+                    <TD className="text-right tabular-nums text-body">
+                      {formatINR(s.performance_bonus)}
+                      {s.rating != null && <span className="block text-[11px]">rating {s.rating}</span>}
+                    </TD>
+                    <TD className="text-right tabular-nums text-body">{formatINR(s.night_shift_pay)}</TD>
                     <TD className="text-right font-extrabold tabular-nums">{formatINR(s.net_pay)}</TD>
                     <TD>
                       {s.payment_status === "paid" ? (

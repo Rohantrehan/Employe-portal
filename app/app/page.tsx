@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowUpRight, CalendarCheck, CalendarHeart, Clock3, Hourglass, TimerReset } from "lucide-react";
+import { ArrowUpRight, CalendarCheck, CalendarHeart, Clock3, Hourglass, TimerReset, Wallet } from "lucide-react";
 import { BarChart } from "@/components/charts/bar-chart";
 import { ChartCard, Headline } from "@/components/charts/chart-card";
 import { BLUE_RAMP } from "@/components/charts/chart-utils";
@@ -12,6 +12,8 @@ import { formatDuration, type DayKind, type DayRecord } from "@/lib/attendance";
 import { daysBetween, monthName, weekday } from "@/lib/holidays";
 import { formatDays, remaining, total, type Balance } from "@/lib/leave";
 import { ClockoutFix, type FixRequest } from "@/components/attendance/clockout-fix";
+import { isSalaryWindow, monthTitle } from "@/lib/payroll";
+import { shiftMonth } from "@/lib/overtime";
 import { ClockCard } from "./clock-card";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -94,6 +96,18 @@ export default async function EmployeeDashboard() {
         title={`${greeting()}, ${profile.full_name.split(" ")[0]}.`}
         description="Plan your day, clock in and keep track of your time."
       />
+
+      {isSalaryWindow(today) && (
+        <div role="status" className="animate-enter mt-6 flex items-start gap-3 rounded-2xl border border-line bg-white px-4 py-3.5 sm:items-center">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-tint text-brand">
+            <Wallet className="h-4 w-4" />
+          </span>
+          <p className="text-sm text-body">
+            <b className="text-ink">Salaries for {monthTitle(shiftMonth(today.slice(0, 7), -1))} are being calculated.</b> Don&apos;t worry if you haven&apos;t
+            received yours yet. Salaries are credited between the 1st and 10th of the month.
+          </p>
+        </div>
+      )}
 
       {missed.length > 0 && (
         <section className="card mt-8 p-5 sm:p-6" aria-label="Missed clock-outs">

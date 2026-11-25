@@ -1,7 +1,7 @@
 import "server-only";
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { formatDate } from "@/lib/format";
-import { amountInWords, formatRs, monthTitle } from "@/lib/payroll";
+import { amountInWords, formatRs, monthTitle, multiplierText, ratingInfo } from "@/lib/payroll";
 import { BODY, BRAND, INK, LINE, LOGO, SOFT, TINT } from "./brand";
 
 const s = StyleSheet.create({
@@ -44,8 +44,12 @@ export type PayslipData = {
   leave_days: number;
   overtime_hours: number;
   basic_salary: number;
+  late_days: number;
+  excellence_bonus: number;
+  rating: number | null;
   performance_bonus: number;
-  extra_pay: number;
+  night_shift_pay: number;
+  remarks: string | null;
   net_pay: number;
   status: "draft" | "published";
   payment_status: "pending" | "paid";
@@ -68,6 +72,15 @@ export function PayslipDocument({ p }: { p: PayslipData }) {
   const period = monthTitle(p.month);
   const isDraft = p.status === "draft";
   const paid = p.payment_status === "paid";
+  const r = ratingInfo(p.rating);
+  const negative = Number(p.performance_bonus) < 0;
+  const perfLabel = (negative ? "Performance Adjustment" : "Performance Bonus") + (r ? ` (rating ${r.value}/5 · ${multiplierText(r.multiplier)})` : "");
+  const earnings: [string, number][] = [
+    ["Basic Salary", p.basic_salary],
+    ["Excellence Bonus", p.excellence_bonus],
+    [perfLabel, p.performance_bonus],
+    ["Night Shift Pay", p.night_shift_pay],
+  ];
 
   return (
     <Document title={`Payslip ${period} · ${p.employee.full_name}`} author="RohTre Media" subject={`Payslip for ${period}`} creator="RohTre Media Employee Portal">
@@ -119,6 +132,7 @@ export function PayslipDocument({ p }: { p: PayslipData }) {
               ["Working days", num(Number(p.working_days))],
               ["Days present", num(Number(p.present_days))],
               ["Leave days", num(Number(p.leave_days))],
+              ["Late days", String(p.late_days)],
               ["Extra hours", num(Number(p.overtime_hours))],
             ].map(([k, v]) => (
               <View key={k} style={s.stat}>
@@ -134,14 +148,10 @@ export function PayslipDocument({ p }: { p: PayslipData }) {
               <Text style={[s.tdLeft, s.label]}>Component</Text>
               <Text style={[s.tdRight, s.label]}>Amount</Text>
             </View>
-            {[
-              ["Basic Salary", p.basic_salary],
-              ["Performance Bonus", p.performance_bonus],
-              ["Extra Pay (extra working hours)", p.extra_pay],
-            ].map(([k, v], i) => (
-              <View key={k as string} style={[s.tr, i === 2 ? { borderBottomWidth: 0 } : {}]}>
-                <Text style={[s.tdLeft, { fontWeight: 600 }]}>{k as string}</Text>
-                <Text style={[s.tdRight, { fontWeight: 600 }]}>{formatRs(v as number)}</Text>
+            {earnings.map(([k, v], i) => (
+              <View key={k} style={[s.tr, i === earnings.length - 1 ? { borderBottomWidth: 0 } : {}]}>
+                <Text style={[s.tdLeft, { fontWeight: 600 }]}>{k}</Text>
+                <Text style={[s.tdRight, { fontWeight: 600 }, v < 0 ? { color: BRAND } : {}]}>{formatRs(v)}</Text>
               </View>
             ))}
           </View>
@@ -155,8 +165,17 @@ export function PayslipDocument({ p }: { p: PayslipData }) {
           {paid && p.payment_ref && (
             <Text style={[s.words, { marginTop: 4 }]}>Payment reference: {p.payment_ref}</Text>
           )}
+          {p.remarks && (
+            <>
+              <Text style={s.sectionTitle}>Remarks</Text>
+              <View style={[s.card, { backgroundColor: SOFT, borderColor: SOFT }]}>
+                <Text style={{ fontSize: 9.5, lineHeight: 1.5 }}>{p.remarks}</Text>
+              </View>
+            </>
+          )}
           <Text style={[s.words, { marginTop: 18, fontSize: 8 }]}>
-            No deductions apply. This is a computer-generated payslip and does not require a signature.
+            {r ? "Performance bonus = (Basic + Excellence Bonus) × (rating multiplier − 1). " : ""}
+            This is a computer-generated payslip and does not require a signature.
           </Text>
         </View>
 

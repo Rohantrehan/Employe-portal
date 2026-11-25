@@ -13,8 +13,10 @@ const rowSchema = z.object({
   employeeId: z.string().uuid(),
   name: z.string(),
   basic: money,
-  bonus: money,
-  extra: money,
+  excellence: money,
+  rating: z.coerce.number().refine((v) => [3, 3.5, 4, 4.5, 5].includes(v), "Pick a rating: 5, 4.5, 4, 3.5 or 3"),
+  night: money,
+  remarks: z.string().trim().max(500, "Remarks can be at most 500 characters").default(""),
 });
 
 function revalidate() {
@@ -33,8 +35,10 @@ export async function saveDrafts(month: string, rows: z.input<typeof rowSchema>[
       p_employee: r.data.employeeId,
       p_month: `${month}-01`,
       p_basic: r.data.basic,
-      p_bonus: r.data.bonus,
-      p_extra: r.data.extra,
+      p_excellence: r.data.excellence,
+      p_rating: r.data.rating,
+      p_night: r.data.night,
+      p_remarks: r.data.remarks,
     });
     if (error) {
       revalidate();

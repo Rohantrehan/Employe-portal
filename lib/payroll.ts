@@ -40,10 +40,40 @@ export function amountInWords(amount: number) {
 
 /** "Rs. 2,45,300.00" (for PDFs, where the ₹ glyph isn't available) */
 export function formatRs(value: number | string | null | undefined) {
-  const n = Number(value ?? 0);
-  return "Rs. " + new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number.isFinite(n) ? n : 0);
+  const raw = Number(value ?? 0);
+  const n = Number.isFinite(raw) ? raw : 0;
+  return (n < 0 ? "- " : "") + "Rs. " + new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(n));
 }
 
 export function monthTitle(month: string) {
   return new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(month.slice(0, 7) + "-01T00:00:00Z"));
 }
+
+/* ---------- Performance rating → multiplier (same table as the database) ---------- */
+
+export const RATINGS = [
+  { value: 5, multiplier: 1.2, label: "Outstanding" },
+  { value: 4.5, multiplier: 1.1, label: "Very good" },
+  { value: 4, multiplier: 1.05, label: "Good" },
+  { value: 3.5, multiplier: 1, label: "Neutral" },
+  { value: 3, multiplier: 0.9, label: "Penalty" },
+] as const;
+
+export const DEFAULT_RATING = 4;
+
+export function ratingInfo(rating: number | null | undefined) {
+  return RATINGS.find((r) => r.value === Number(rating)) ?? null;
+}
+
+/** Performance bonus = (Basic + Excellence bonus) × (multiplier − 1). Negative at rating 3. */
+export function performanceBonus(basic: number, excellence: number, rating: number) {
+  const m = ratingInfo(rating)?.multiplier;
+  if (m == null) return NaN;
+  return Math.round((basic + excellence) * (m - 1) * 100) / 100;
+}
+
+/** "×1.10" */
+export const multiplierText = (m: number) => `×${m.toFixed(2)}`;
+
+/** First 10 days of the month, when last month's salaries are still being worked out. */
+export const isSalaryWindow = (todayISO: string) => Number(todayISO.slice(8, 10)) <= 10;

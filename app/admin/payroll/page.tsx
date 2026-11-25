@@ -36,8 +36,12 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
     overtimeHours: Number(r.overtime_hours ?? 0),
     payslipId: (r.payslip_id as string | null) ?? null,
     basic: r.basic_salary == null ? null : Number(r.basic_salary),
+    lateDays: Number(r.late_days ?? 0),
+    excellence: r.excellence_bonus == null ? null : Number(r.excellence_bonus),
+    rating: r.rating == null ? null : Number(r.rating),
     bonus: r.performance_bonus == null ? null : Number(r.performance_bonus),
-    extra: r.extra_pay == null ? null : Number(r.extra_pay),
+    night: r.night_shift_pay == null ? null : Number(r.night_shift_pay),
+    remarks: (r.remarks as string | null) ?? "",
     net: r.net_pay == null ? null : Number(r.net_pay),
     status: (r.status as PayslipStatus | null) ?? null,
     paymentStatus: (r.payment_status as PaymentStatus | null) ?? null,
@@ -58,7 +62,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
       <PageHeader
         eyebrow="Company"
         title="Payroll"
-        description="Basic Salary + Performance Bonus + Extra Pay = Net Pay. Save drafts, then publish so employees can download their payslips."
+        description="Net pay = Basic + Excellence bonus + Performance bonus + Night shift pay. The performance bonus comes from the rating: (Basic + Excellence) × (multiplier − 1)."
         actions={
           <div className="flex items-center gap-2">
             <Link href={href(shiftMonth(month, -1))} className={navBtn} aria-label="Previous month">
