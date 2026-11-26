@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { homeFor, isFormer, type Role } from "@/lib/auth";
+import { getSession, homeFor, isFormer, type Role } from "@/lib/auth";
 
 export type FormState = { error?: string; fieldErrors?: Record<string, string> } | undefined;
 
@@ -28,11 +28,8 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
     return { error: banned ? "This account has been deactivated. Please contact your admin." : "Incorrect email or password." };
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, is_hr, is_active, must_change_password, left_on, former_access")
-    .eq("id", data.user.id)
-    .single<{ role: Role; is_hr: boolean; is_active: boolean; must_change_password: boolean; left_on: string | null; former_access: boolean }>();
+  const { data: rows } = await supabase.rpc("my_account");
+  const profile = ((rows ?? []) as { role: Role; is_hr: boolean; is_active: boolean; must_change_password: boolean; left_on: string | null; former_access: boolean }[])[0];
 
   // People who have left can still log in to download their letters and payslips, if the admin allows it.
   if (profile && isFormer(profile)) {
@@ -46,7 +43,8 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
     return { error: "This account has been deactivated. Please contact your admin." };
   }
 
-  redirect(profile.must_change_password ? "/change-password" : homeFor(profile));
+  // Everyone (except people who have left) enters a code from their authenticator app next.
+  redirect("/mfa");
 }
 
 const passwordSchema = z
@@ -74,6 +72,9 @@ export async function changePassword(_prev: FormState, formData: FormData): Prom
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  // The 2-step code comes first (people who have left use password only).
+  const session = await getSession();
+  if (session && session.aal !== "aal2" && !(session.profile && isFormer(session.profile))) redirect("/mfa");
 
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
   if (error) {
@@ -82,6 +83,7 @@ export async function changePassword(_prev: FormState, formData: FormData): Prom
   }
 
   await supabase.rpc("mark_password_changed");
-  const { data: profile } = await supabase.from("profiles").select("role, is_hr").eq("id", user.id).single<{ role: Role; is_hr: boolean }>();
+  const { data: rows } = await supabase.rpc("my_account");
+  const profile = ((rows ?? []) as { role: Role; is_hr: boolean }[])[0];
   redirect(profile ? homeFor(profile) : "/app");
 }

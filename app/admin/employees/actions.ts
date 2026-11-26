@@ -279,8 +279,8 @@ export async function deleteDepartment(id: string): Promise<ActionResult> {
 export async function resetAdminTwoFactor(id: string): Promise<ActionResult> {
   const { supabase, profile: me } = await requireRole("admin");
   if (id === me.id) return { ok: false, error: "Change your own app from Settings instead." };
-  const { data: target } = await supabase.from("profiles").select("role, is_hr").eq("id", id).single();
-  if (!target || (target.role !== "admin" && !target.is_hr)) return { ok: false, error: "Only admins and HR use 2-step sign-in." };
+  const { data: target } = await supabase.from("profiles").select("id").eq("id", id).single();
+  if (!target) return { ok: false, error: "Employee not found." };
 
   const admin = createAdminClient();
   const { data, error } = await admin.auth.admin.mfa.listFactors({ userId: id });

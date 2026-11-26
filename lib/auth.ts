@@ -41,11 +41,9 @@ export const getSession = cache(async () => {
   const user = { id: claims.sub, email: (claims.email as string | undefined) ?? null };
   // "aal2" once the authenticator-app step is done (required for admins).
   const aal = (claims.aal as string | undefined) ?? "aal1";
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, role, emp_code, full_name, email, designation, avatar_url, is_active, must_change_password, left_on, former_access, is_hr")
-    .eq("id", user.id)
-    .single<Profile>();
+  // RPC, not the table: it works before the 2-step code is entered (the API refuses everything else until then).
+  const { data: rows } = await supabase.rpc("my_account");
+  const profile = ((rows ?? []) as Profile[])[0] ?? null;
   return { user, profile, supabase, aal };
 });
 
@@ -54,7 +52,7 @@ export const getSession = cache(async () => {
  * - not logged in → /login
  * - left (past last working day) → /former (documents only)
  * - inactive or no profile → /login?error=inactive
- * - admin without the authenticator-app step → /mfa
+ * - no authenticator-app step yet → /mfa (everyone)
  * - must change password → /change-password
  * - wrong role → that role's home (HR may use both areas)
  */
@@ -65,7 +63,7 @@ export async function requireRole(role: Role) {
   // Past their last working day → documents-only area (or out, if the admin turned that off).
   if (profile && isFormer(profile)) redirect(profile.former_access ? "/former" : "/auth/logout?reason=inactive");
   if (!profile || !profile.is_active) redirect("/auth/logout?reason=inactive");
-  if (hasAdminRights(profile) && session.aal !== "aal2") redirect("/mfa");
+  if (session.aal !== "aal2") redirect("/mfa");
   if (profile.must_change_password) redirect("/change-password");
   const allowed = role === "admin" ? hasAdminRights(profile) : profile.role === "employee";
   if (!allowed) redirect(homeFor(profile));

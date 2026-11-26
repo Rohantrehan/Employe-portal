@@ -87,7 +87,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
   const allLetters = ((letters ?? []) as AdminLetter[]).map((l) => ({ ...l, salary: l.salary == null ? null : Number(l.salary) }));
   // Other admins: has 2-step sign-in been set up? (factors are only visible with the service key)
   let twoFactor: boolean | null = null;
-  if ((emp.role === "admin" || emp.is_hr) && !isMe) {
+  if (!isMe) {
     const { data: f } = await createAdminClient().auth.admin.mfa.listFactors({ userId: emp.id });
     twoFactor = !!f?.factors.some((x) => x.status === "verified");
   }

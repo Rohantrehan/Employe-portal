@@ -52,10 +52,12 @@ export async function middleware(request: NextRequest) {
     const hr = role === "employee" && meta?.hr === true;
     const adminRights = role === "admin" || hr;
     const home = adminRights ? "/admin" : "/app";
-    // Admins and HR must pass the authenticator-app step before anything else.
-    if (adminRights && user.aal !== "aal2" && path !== "/mfa" && !isPublic(path)) return redirectTo("/mfa");
-    if (adminRights && user.aal !== "aal2" && path === "/login") return redirectTo("/mfa");
-    if (path === "/" || path === "/login" || (!adminRights && path === "/mfa")) return redirectTo(home);
+    // Everyone passes the authenticator-app step before anything else. People who have
+    // left only use /former (password only); its page and the database check that.
+    const passOk = (p: string) => p === "/mfa" || p === "/former" || p === "/change-password" || p.startsWith("/api/") || isPublic(p);
+    if (user.aal !== "aal2" && !passOk(path)) return redirectTo("/mfa");
+    if (user.aal !== "aal2" && path === "/login") return redirectTo("/mfa");
+    if (path === "/" || path === "/login") return redirectTo(home);
     // Wrong area → own home (layouts re-check this against the database)
     if (!adminRights && (path === "/admin" || path.startsWith("/admin/"))) return redirectTo(home);
     if (role === "admin" && (path === "/app" || path.startsWith("/app/") || path === "/former")) return redirectTo(home);

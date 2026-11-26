@@ -34,7 +34,7 @@ function CodeForm({ factorId, firstTime, label }: { factorId: string; firstTime:
         return setError(res.error);
       }
       if (firstTime) toast.success("2-step sign-in is on");
-      router.replace("/admin");
+      router.replace(res.next);
       router.refresh();
     });
   };
@@ -61,11 +61,13 @@ function CodeForm({ factorId, firstTime, label }: { factorId: string; firstTime:
   );
 }
 
-export function MfaVerify({ factorId }: { factorId: string }) {
+export function MfaVerify({ factorId, admin }: { factorId: string; admin: boolean }) {
   return (
     <>
       <CodeForm factorId={factorId} firstTime={false} label="6-digit code" />
-      <p className="mt-4 text-[13px] text-body">Lost your phone? Ask another admin to reset your 2-step sign-in from your employee page.</p>
+      <p className="mt-4 text-[13px] text-body">
+        Lost your phone? Ask {admin ? "another admin" : "your admin"} to reset your 2-step sign-in from your employee page.
+      </p>
     </>
   );
 }

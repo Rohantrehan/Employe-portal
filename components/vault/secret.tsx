@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Eye, EyeOff, KeyRound, Loader2, ShieldCheck, StickyNote } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
+import { askForCode } from "./recheck-dialog";
 
 type What = "password" | "code" | "notes";
 const HIDE_AFTER_MS = 30_000;
 
-async function reveal(id: string, what: What): Promise<{ value?: string; code?: string; secondsLeft?: number }> {
+async function reveal(id: string, what: What, retried = false): Promise<{ value?: string; code?: string; secondsLeft?: number }> {
   const res = await fetch(`/api/vault/${id}/reveal`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -16,6 +17,11 @@ async function reveal(id: string, what: What): Promise<{ value?: string; code?: 
     cache: "no-store",
   });
   const json = await res.json().catch(() => ({}));
+  // No authenticator code in the last 10 minutes: ask for one, then try again once.
+  if (json.stepUp && !retried) {
+    if (await askForCode()) return reveal(id, what, true);
+    throw new Error("Not shown. A code from your authenticator app is needed.");
+  }
   if (!res.ok) throw new Error(json.error ?? "Could not open this account.");
   return json;
 }

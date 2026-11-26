@@ -32,6 +32,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!auth?.claims?.sub) return fail("Please sign in again.", 401);
 
   const { data, error } = await supabase.rpc("vault_secret", { p_item: id, p_what: what });
+  // Needs a fresh authenticator code (older than 10 minutes): the page asks for one and retries.
+  if (error?.hint === "step_up") return NextResponse.json({ error: error.message, stepUp: true }, { status: 401, headers: NO_STORE });
   if (error) return fail(error.code === "P0001" || error.code === "42501" ? error.message : "Could not open this account.", error.code === "42501" ? 403 : 400);
 
   try {

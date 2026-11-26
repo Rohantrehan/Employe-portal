@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Eyebrow } from "@/components/ui/misc";
-import { getSession } from "@/lib/auth";
+import { getSession, isFormer } from "@/lib/auth";
 import { AuthFrame } from "../auth-frame";
 import { ChangePasswordForm } from "./change-password-form";
 
@@ -10,6 +10,8 @@ export const metadata: Metadata = { title: "Set your password" };
 export default async function ChangePasswordPage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  // Password changes need the 2-step code first (except for people who have left).
+  if (session.aal !== "aal2" && !(session.profile && isFormer(session.profile))) redirect("/mfa");
   const firstName = session.profile?.full_name.split(" ")[0];
 
   return (

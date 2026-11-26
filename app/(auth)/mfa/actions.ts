@@ -1,15 +1,16 @@
 "use server";
 
-import { getSession, hasAdminRights } from "@/lib/auth";
+import { getSession, hasAdminRights, homeFor, isFormer } from "@/lib/auth";
 
 export type EnrollResult = { ok: true; factorId: string; qr: string; secret: string } | { ok: false; error: string };
-export type VerifyResult = { ok: true } | { ok: false; error: string };
+export type VerifyResult = { ok: true; next: string } | { ok: false; error: string };
 
 const ISSUER = "RohTre Media Portal";
 
 async function adminSession() {
   const session = await getSession();
-  if (!session?.profile || !hasAdminRights(session.profile) || !session.profile.is_active) return null;
+  // Everyone who still works here (people who have left use password only).
+  if (!session?.profile || !session.profile.is_active || isFormer(session.profile)) return null;
   return session;
 }
 
@@ -48,13 +49,13 @@ export async function verifyCode(factorId: string, code: string, firstTime: bool
       error: error.status === 429 ? "Too many tries. Wait a minute and try again." : "That code didn't work. Use the newest code in your app and check your phone's time is automatic.",
     };
   }
-  await supabase.rpc("log_action", {
-    p_action: firstTime ? "admin.2fa_setup" : "admin.2fa_login",
-    p_entity: "profile",
-    p_entity_id: session.user.id,
-    p_payload: null,
-  });
-  return { ok: true };
+  if (hasAdminRights(session.profile!)) {
+    await supabase.rpc("log_action", { p_action: firstTime ? "admin.2fa_setup" : "admin.2fa_login", p_entity: "profile", p_entity_id: session.user.id, p_payload: null });
+  } else {
+    await supabase.rpc("log_my_2fa", { p_action: firstTime ? "2fa.setup" : "2fa.login" });
+  }
+  const p = session.profile!;
+  return { ok: true, next: p.must_change_password ? "/change-password" : homeFor(p) };
 }
 
 /** "Use a different phone": removes your own authenticator so you can set it up again. Needs a 2-step session. */
@@ -63,10 +64,10 @@ export async function resetMyFactor(): Promise<VerifyResult> {
   if (!session || session.aal !== "aal2") return { ok: false, error: "Please log in again." };
   const { supabase } = session;
   const { data } = await supabase.auth.mfa.listFactors();
-  await supabase.rpc("log_action", { p_action: "admin.2fa_reset_self", p_entity: "profile", p_entity_id: session.user.id, p_payload: null });
+  if (hasAdminRights(session.profile!)) await supabase.rpc("log_action", { p_action: "admin.2fa_reset_self", p_entity: "profile", p_entity_id: session.user.id, p_payload: null });
   for (const f of data?.all ?? []) {
     const { error } = await supabase.auth.mfa.unenroll({ factorId: f.id });
     if (error) return { ok: false, error: "Could not remove the old app. Please try again." };
   }
-  return { ok: true };
+  return { ok: true, next: "/mfa" };
 }
