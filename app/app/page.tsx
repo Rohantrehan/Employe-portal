@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowUpRight, ListChecks, CalendarCheck, CalendarHeart, Clock3, Hourglass, TimerReset, Wallet } from "lucide-react";
+import { ArrowUpRight, FileSignature, ListChecks, CalendarCheck, CalendarHeart, Clock3, Hourglass, TimerReset, Wallet } from "lucide-react";
 import { BarChart } from "@/components/charts/bar-chart";
 import { ChartCard, Headline } from "@/components/charts/chart-card";
 import { BLUE_RAMP } from "@/components/charts/chart-utils";
@@ -10,7 +10,8 @@ import { requireRole } from "@/lib/auth";
 import { formatDate, todayIST } from "@/lib/format";
 import { formatDuration, type DayKind, type DayRecord, type MyShift } from "@/lib/attendance";
 import { daysBetween, monthName, weekday } from "@/lib/holidays";
-import { formatDays, remaining, total, type Balance } from "@/lib/leave";
+import { balancesOn, formatDays, periodText, remaining, total, usable } from "@/lib/leave";
+import { daysUntil } from "@/lib/letters";
 import { ClockoutFix, type FixRequest } from "@/components/attendance/clockout-fix";
 import { isSalaryWindow, monthTitle } from "@/lib/payroll";
 import { shiftMonth } from "@/lib/overtime";
@@ -34,15 +35,14 @@ const PENDING_HATCH = "repeating-linear-gradient(45deg, #9ca3af 0 3px, #e5e7eb 3
 export default async function EmployeeDashboard() {
   const { supabase, profile } = await requireRole("employee");
   const today = todayIST();
-  const year = Number(today.slice(0, 4));
   const monthStart = today.slice(0, 8) + "01";
 
   const since = new Date(Date.parse(today + "T00:00:00Z") - 30 * 86_400_000).toISOString().slice(0, 10);
-  const [{ data: month }, { data: shiftData }, { data: mine }, { data: balances }, { data: types }, { data: missedRows }, { data: fixReqs }, { data: steps }, { data: me }, { data: milestones }, { data: company }] = await Promise.all([
+  const [{ data: month }, { data: shiftData }, { data: mine }, balances, { data: types }, { data: missedRows }, { data: fixReqs }, { data: steps }, { data: me }, { data: milestones }, { data: company }, { data: contracts }] = await Promise.all([
     supabase.rpc("employee_month", { p_employee: profile.id, p_month: monthStart }),
     supabase.rpc("my_shift"),
     supabase.rpc("my_dashboard", { p_days: 14 }),
-    supabase.from("leave_balances").select("leave_type_id, allotted, carried, used, pending").eq("employee_id", profile.id).eq("year", year),
+    balancesOn(supabase, today, profile.id),
     supabase.from("leave_types").select("id, name, tracks_balance, is_active, sort_order").eq("is_active", true).eq("tracks_balance", true).order("sort_order"),
     supabase
       .from("attendance")
@@ -62,7 +62,20 @@ export default async function EmployeeDashboard() {
     supabase.from("profiles").select("date_of_joining").eq("id", profile.id).single(),
     supabase.from("linkedin_milestones").select("years").eq("employee_id", profile.id),
     supabase.from("settings").select("company_name").single(),
+    supabase.from("contracts").select("starts_on, ends_on").eq("employee_id", profile.id).order("starts_on"),
   ]);
+  // Contract ending (or just ended) with no renewal yet.
+  const myContracts = contracts ?? [];
+  const nowContract = myContracts.find((c) => c.starts_on <= today && c.ends_on >= today);
+  const lastEnded = [...myContracts].reverse().find((c) => c.ends_on < today);
+  const renewed = (after: string) => myContracts.some((c) => c.starts_on > after);
+  const contractNote =
+    nowContract && daysUntil(today, nowContract.ends_on) <= 30 && !renewed(nowContract.ends_on)
+      ? { ended: false, date: nowContract.ends_on, n: daysUntil(today, nowContract.ends_on) }
+      : !nowContract && lastEnded && daysUntil(lastEnded.ends_on, today) <= 30 && !renewed(lastEnded.ends_on)
+        ? { ended: true, date: lastEnded.ends_on, n: daysUntil(lastEnded.ends_on, today) }
+        : null;
+  const contractLeave = balances.filter((b) => b.state === "current" || b.state === "ended");
   const myLeft = (steps ?? []).filter((t) => t.owner === "employee" && !t.done_at).length;
   const myDone = (steps ?? []).filter((t) => t.done_at).length;
   const anniversary = recentAnniversary(me?.date_of_joining ?? null, today);
@@ -101,8 +114,8 @@ export default async function EmployeeDashboard() {
 
   const balanceRows = (types ?? [])
     .map((t) => {
-      const b = (balances ?? []).find((x) => x.leave_type_id === t.id) as Balance | undefined;
-      return b ? { name: t.name, total: total(b), used: Number(b.used), pending: Number(b.pending), left: remaining(b) } : null;
+      const b = balances.find((x) => x.leave_type_id === t.id && x.balance_id);
+      return b ? { name: t.name, total: total(b), used: Number(b.used), pending: Number(b.pending), left: usable(b), period: periodText(b) } : null;
     })
     .filter((x): x is NonNullable<typeof x> => !!x);
 
@@ -156,6 +169,37 @@ export default async function EmployeeDashboard() {
       )}
 
       {showAnniversary && <AnniversaryCard years={anniversary.years} daysSince={anniversary.daysSince} company={company?.company_name ?? "RohTre Media"} />}
+
+      {contractNote && (
+        <section aria-label="Your contract" className="animate-enter mt-6 flex items-start gap-4 rounded-[24px] border border-line bg-white p-5 sm:p-6">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-warning-tint text-warning">
+            <FileSignature className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-base font-bold text-ink">
+              {contractNote.ended
+                ? `Your contract ended on ${formatDate(contractNote.date)}`
+                : `Your contract ends on ${formatDate(contractNote.date)} · ${contractNote.n === 0 ? "today" : `in ${contractNote.n} day${contractNote.n === 1 ? "" : "s"}`}`}
+            </h2>
+            <p className="mt-0.5 text-sm text-body">
+              {contractLeave.length > 0 &&
+                contractLeave.map((b, i) => {
+                  const t = (types ?? []).find((x) => x.id === b.leave_type_id);
+                  return (
+                    <span key={b.leave_type_id}>
+                      {i > 0 && ", "}
+                      <b className="text-ink">{formatDays(remaining(b))}</b> of {t?.name ?? "leave"} unused
+                    </span>
+                  );
+                })}
+              {contractLeave.length > 0 && ". "}
+              {contractNote.ended
+                ? "You can take it again once HR renews your contract: unused days carry over."
+                : "If the contract is renewed, unused days carry over. If it isn't, they lapse."}
+            </p>
+          </div>
+        </section>
+      )}
 
       {myLeft > 0 && (
         <Link
@@ -252,7 +296,7 @@ export default async function EmployeeDashboard() {
 
         <ChartCard
           className={tracked ? undefined : "xl:col-span-2"}
-          title={`Leave balance ${year}`}
+          title="Leave balance"
           description="Used, pending and left per leave type"
           action={
             <Link href="/app/leaves" className="inline-flex items-center gap-1 text-[12px] font-semibold text-body hover:text-brand">
@@ -273,6 +317,7 @@ export default async function EmployeeDashboard() {
                         <span className="font-bold text-ink">{Number(b.left)}</span> of {formatDays(b.total)} left
                       </span>
                     </div>
+                    {b.period && <p className="text-[11.5px] text-body">{b.period}</p>}
                     <div className="mt-1.5 flex h-2.5 gap-[2px] overflow-hidden rounded-full bg-grey-tile" role="img" aria-label={`${b.name}: ${b.used} used, ${b.pending} pending, ${b.left} left of ${b.total}`}>
                       {b.used > 0 && <span className="h-full rounded-l-full bg-ink" style={{ width: `${pct(b.used)}%` }} />}
                       {b.pending > 0 && <span className="h-full" style={{ width: `${pct(b.pending)}%`, background: PENDING_HATCH }} />}
@@ -293,7 +338,7 @@ export default async function EmployeeDashboard() {
               </li>
             </ul>
           ) : (
-            <p className="py-10 text-center text-sm text-body">No leave balances for {year} yet.</p>
+            <p className="py-10 text-center text-sm text-body">No leave balances yet.</p>
           )}
         </ChartCard>
         {!tracked && nextHolidayCard}

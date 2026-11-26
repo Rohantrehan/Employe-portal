@@ -13,7 +13,7 @@ import { EmptyState } from "@/components/ui/misc";
 import { Tabs } from "@/components/ui/tabs";
 import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/format";
-import { LEAVE_STATUS, formatDays, formatRange, remaining, total, type Balance, type DayPart, type LeaveStatus, type LeaveType } from "@/lib/leave";
+import { LEAVE_STATUS, formatDays, formatRange, periodText, remaining, total, usable, type Balance, type DayPart, type LeaveStatus, type LeaveType } from "@/lib/leave";
 import { applyLeave, cancelLeave, myAttachmentUrl, previewLeave, type Preview } from "./actions";
 
 export type MyRequest = {
@@ -98,23 +98,43 @@ function BalanceCard({ type, balance, requests, year }: { type: LeaveType; balan
       </div>
     );
   }
-  const left = balance ? remaining(balance) : 0;
+  const left = balance ? usable(balance) : 0;
   const tot = balance ? total(balance) : 0;
+  const n = (v: number) => (Number.isInteger(v) ? v : v.toFixed(1));
+  const period = balance ? periodText(balance) : null;
+  const ended = balance?.state === "ended";
+  const carried = Number(balance?.carried ?? 0);
   return (
-    <div className="card flex items-center gap-4 p-5">
-      <div className="relative shrink-0">
-        <Ring value={left} max={tot} color={type.color} />
-        <span className="absolute inset-0 grid place-items-center text-sm font-extrabold text-ink">{Number.isInteger(left) ? left : left.toFixed(1)}</span>
+    <div className="card p-5">
+      <div className="flex items-center gap-4">
+        <div className="relative shrink-0">
+          <Ring value={left} max={tot} color={type.color} />
+          <span className="absolute inset-0 grid place-items-center text-sm font-extrabold text-ink">{n(left)}</span>
+        </div>
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-body">{type.name}</p>
+          <p className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-ink">
+            {n(left)} <span className="text-sm font-semibold text-body">of {n(tot)} left</span>
+          </p>
+          <p className="text-[13px] text-body">
+            {Number(balance?.used ?? 0)} used{Number(balance?.pending ?? 0) > 0 && ` · ${Number(balance?.pending)} pending`}
+          </p>
+        </div>
       </div>
-      <div className="min-w-0">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-body">{type.name}</p>
-        <p className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-ink">
-          {Number.isInteger(left) ? left : left.toFixed(1)} <span className="text-sm font-semibold text-body">of {tot} left</span>
-        </p>
-        <p className="text-[13px] text-body">
-          {Number(balance?.used ?? 0)} used{Number(balance?.pending ?? 0) > 0 && ` · ${Number(balance?.pending)} pending`}
-        </p>
-      </div>
+      {period && (
+        <div className="mt-3 border-t border-line pt-3 text-[12px] leading-relaxed text-body">
+          <p className={cn("font-semibold", ended ? "text-warning" : "text-ink")}>{period}</p>
+          {ended ? (
+            <p>{n(remaining(balance!))} unused carry over if it&apos;s renewed.</p>
+          ) : (
+            carried > 0 && (
+              <p>
+                {n(Number(balance!.allotted))} for this contract + {n(carried)} carried over
+              </p>
+            )
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -313,7 +333,7 @@ function ApplyModal({
 
   const leftFor = (id: string) => {
     const b = balances.find((x) => x.leave_type_id === id);
-    return b ? remaining(b) : 0;
+    return b ? usable(b) : 0;
   };
   const canSubmit = !!preview && !preview.error && preview.days > 0 && reason.trim().length >= 3 && (!type?.requires_attachment || !!file) && !checking;
 

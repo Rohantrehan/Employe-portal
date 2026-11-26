@@ -11,10 +11,12 @@ import { Input } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 import { Avatar, EmptyState } from "@/components/ui/misc";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import type { LeaveType } from "@/lib/leave";
+import { formatDate } from "@/lib/format";
+import { usable, type Balance, type LeaveType } from "@/lib/leave";
+import { setLeaveLeft } from "@/app/admin/employees/[id]/contract-actions";
 import { setAllotment } from "./actions";
 
-type Bal = { id: string; leave_type_id: string; allotted: number; carried: number; used: number; pending: number };
+type Bal = Balance & { id: string };
 export type BalanceRow = { employeeId: string; name: string; empCode: string; avatar: string | null; balances: Bal[] };
 
 export function BalancesPanel({ rows, types, year }: { rows: BalanceRow[]; types: LeaveType[]; year: number }) {
@@ -30,7 +32,7 @@ export function BalancesPanel({ rows, types, year }: { rows: BalanceRow[]; types
 
   return (
     <Card className="overflow-hidden">
-      <CardHeader title={`Balances ${year}`} description="Left of total, per employee. Click a cell to give someone more or fewer days." />
+      <CardHeader title={`Balances ${year}`} description="Left of total, per employee. Contract leave shows the current contract. Click a cell to change it." />
       <Table>
         <THead>
           <tr>
@@ -60,7 +62,8 @@ export function BalancesPanel({ rows, types, year }: { rows: BalanceRow[]; types
               {types.map((t) => {
                 const b = row.balances.find((x) => x.leave_type_id === t.id);
                 if (!b) return <TD key={t.id} className="text-body">—</TD>;
-                const left = b.allotted + b.carried - b.used - b.pending;
+                const left = usable(b);
+                const contract = b.state && b.state !== "year";
                 return (
                   <TD key={t.id}>
                     <button
@@ -73,6 +76,12 @@ export function BalancesPanel({ rows, types, year }: { rows: BalanceRow[]; types
                         <b className="tabular-nums text-ink">{left}</b>
                         <span className="text-body"> / {b.allotted + b.carried}</span>
                         {b.pending > 0 && <span className="block text-xs text-warning">{b.pending} pending</span>}
+                        {contract && b.ends_on && (
+                          <span className={`block text-xs ${b.state === "ended" ? "text-warning" : "text-body"}`}>
+                            {b.state === "ended" ? "Ended " : b.state === "upcoming" ? "Starts " : "Until "}
+                            {formatDate(b.state === "upcoming" ? b.starts_on! : b.ends_on)}
+                          </span>
+                        )}
                       </span>
                       <Pencil className="h-3.5 w-3.5 text-body opacity-0 transition-opacity group-hover:opacity-100" />
                     </button>
@@ -83,7 +92,7 @@ export function BalancesPanel({ rows, types, year }: { rows: BalanceRow[]; types
           ))}
         </TBody>
       </Table>
-      {editing && <AllotmentModal {...editing} year={year} onClose={() => setEditing(null)} />}
+      {editing && (editing.bal.state && editing.bal.state !== "year" ? <LeftModal {...editing} onClose={() => setEditing(null)} /> : <AllotmentModal {...editing} year={year} onClose={() => setEditing(null)} />)}
     </Card>
   );
 }
@@ -134,6 +143,59 @@ function AllotmentModal({ row, type, bal, year, onClose }: { row: BalanceRow; ty
         onChange={(e) => setValue(e.target.value)}
         error={error ?? undefined}
         hint={`Minimum ${min} (already used or pending).`}
+      />
+    </Modal>
+  );
+}
+
+function LeftModal({ row, type, bal, onClose }: { row: BalanceRow; type: LeaveType; bal: Bal; onClose: () => void }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
+  const [value, setValue] = useState(fmt(bal.allotted + bal.carried - bal.used - bal.pending));
+  const [error, setError] = useState<string | null>(null);
+
+  const save = () =>
+    start(async () => {
+      setError(null);
+      const v = Number(value);
+      if (!Number.isFinite(v)) return setError("Enter a number.");
+      const res = await setLeaveLeft(bal.id, row.employeeId, v);
+      if (!res.ok) return setError(res.error);
+      toast.success(`${row.name}: ${type.name} left set to ${fmt(v)}`);
+      onClose();
+      router.refresh();
+    });
+
+  return (
+    <Modal
+      open
+      size="sm"
+      onClose={() => !pending && onClose()}
+      title={`${type.name} for ${row.name}`}
+      description={`Contract ${formatDate(bal.starts_on)} – ${formatDate(bal.ends_on)}. ${fmt(bal.allotted)} for the contract${bal.carried ? ` + ${fmt(bal.carried)} carried over` : ""}, ${fmt(bal.used)} used${bal.pending ? `, ${fmt(bal.pending)} pending` : ""}.`}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={pending}>
+            Cancel
+          </Button>
+          <Button onClick={save} loading={pending}>
+            Save
+          </Button>
+        </>
+      }
+    >
+      <Input
+        label="Days left"
+        type="number"
+        inputMode="decimal"
+        min={0}
+        max={365}
+        step="0.5"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        error={error ?? undefined}
+        hint="Replaces the automatic number. All contracts are on the employee's page."
       />
     </Modal>
   );

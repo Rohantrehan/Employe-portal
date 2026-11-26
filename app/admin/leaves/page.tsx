@@ -4,7 +4,7 @@ import { PageHeader, StatTile } from "@/components/ui/misc";
 import { YearSwitch } from "@/components/holidays/bits";
 import { requireRole } from "@/lib/auth";
 import { todayIST } from "@/lib/format";
-import type { DayPart, LeaveStatus, LeaveType } from "@/lib/leave";
+import { balancesOn, type DayPart, type LeaveStatus, type LeaveType } from "@/lib/leave";
 import { LeaveTabs } from "./leave-tabs";
 import { RequestsPanel, type AdminRequest } from "./requests-panel";
 import { BalancesPanel, type BalanceRow } from "./balances-panel";
@@ -64,16 +64,18 @@ export default async function AdminLeavesPage({ searchParams }: { searchParams: 
   let balances: BalanceRow[] = [];
   let policies: { leave_type_id: string; default_quota: number }[] = [];
   if (tab === "balances") {
-    const [{ data: emps }, { data: bals }] = await Promise.all([
+    // Contract leave: the contract that covers today (or the end of a past year / start of next year).
+    const on = year === thisYear ? today : year < thisYear ? `${year}-12-31` : `${year}-01-01`;
+    const [{ data: emps }, bals] = await Promise.all([
       supabase.from("profiles").select("id, full_name, emp_code, avatar_url").eq("role", "employee").eq("is_active", true).order("full_name"),
-      supabase.from("leave_balances").select("id, employee_id, leave_type_id, allotted, carried, used, pending").eq("year", year),
+      balancesOn(supabase, on),
     ]);
     balances = (emps ?? []).map((e) => ({
       employeeId: e.id,
       name: e.full_name,
       empCode: e.emp_code,
       avatar: e.avatar_url,
-      balances: (bals ?? []).filter((b) => b.employee_id === e.id).map((b) => ({ ...b, allotted: Number(b.allotted), carried: Number(b.carried), used: Number(b.used), pending: Number(b.pending) })),
+      balances: bals.filter((b) => b.employee_id === e.id && b.balance_id).map((b) => ({ ...b, id: b.balance_id! })),
     }));
   }
   if (tab === "types") {
@@ -86,7 +88,7 @@ export default async function AdminLeavesPage({ searchParams }: { searchParams: 
       <PageHeader
         eyebrow="People"
         title="Leave"
-        description="Approve requests, adjust balances and set yearly quotas. Unused leave does not carry forward."
+        description="Approve requests, adjust balances and set quotas. Yearly leave doesn't carry forward; contract leave carries over on renewal."
         actions={<YearSwitch year={year} max={thisYear + 1} hrefFor={(y) => `/admin/leaves?tab=${tab}${y === thisYear ? "" : `&year=${y}`}`} />}
       />
 

@@ -39,11 +39,9 @@ export default async function AdminDashboard() {
     supabase.rpc("admin_dashboard"),
     supabase.from("clockout_fix_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
     supabase
-      .from("letters")
-      .select("employee_id, date_from, date_to, profiles!letters_employee_id_fkey(full_name, is_active)")
-      .eq("kind", "contract")
-      .eq("status", "issued")
-      .gte("date_to", todayIST()),
+      .from("contracts")
+      .select("employee_id, starts_on, ends_on, profiles!contracts_employee_id_fkey(full_name, is_active, left_on)")
+      .gte("ends_on", new Date(Date.parse(todayIST() + "T00:00:00Z") - 30 * 86_400_000).toISOString().slice(0, 10)),
     supabase.from("employee_tasks").select("employee_id, kind, owner, done_at, profiles!employee_tasks_employee_id_fkey(full_name)"),
     supabase.rpc("vault_rotation_needed"),
   ]);
@@ -62,14 +60,14 @@ export default async function AdminDashboard() {
   )
     .filter((g) => g.done < g.total)
     .sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "offboarding" ? -1 : 1));
-  // Contracts that end within 30 days and have not been renewed yet.
+  // Contracts that end within 30 days (or ended in the last 30) with no renewal and no exit recorded.
   const today0 = todayIST();
-  type CRow = { employee_id: string; date_from: string; date_to: string; profiles: { full_name: string; is_active: boolean } | null };
+  type CRow = { employee_id: string; starts_on: string; ends_on: string; profiles: { full_name: string; is_active: boolean; left_on: string | null } | null };
   const cRows = (contractRows ?? []) as unknown as CRow[];
   const ending = cRows
-    .filter((c) => c.profiles?.is_active && c.date_from <= today0 && daysUntil(today0, c.date_to) <= 30)
-    .filter((c) => !cRows.some((o) => o.employee_id === c.employee_id && o.date_from > c.date_to))
-    .sort((a, b) => a.date_to.localeCompare(b.date_to));
+    .filter((c) => c.profiles?.is_active && !c.profiles.left_on && c.starts_on <= today0 && daysUntil(today0, c.ends_on) <= 30)
+    .filter((c) => !cRows.some((o) => o.employee_id === c.employee_id && o.starts_on > c.ends_on))
+    .sort((a, b) => a.ends_on.localeCompare(b.ends_on));
   const fixes = fixCount ?? 0;
   const d = data as Dashboard | null;
 
@@ -146,16 +144,16 @@ export default async function AdminDashboard() {
             <FileSignature className="h-[18px] w-[18px] text-warning" />
             <h2 className="text-base font-bold tracking-[-0.01em] text-ink">Contracts ending soon</h2>
           </div>
-          <p className="mt-0.5 text-sm text-body">Renew them from the employee&apos;s page, or record their exit.</p>
+          <p className="mt-0.5 text-sm text-body">Renew them to carry unused leave over, or record their exit. Without a renewal the leave lapses.</p>
           <ul className="mt-3 divide-y divide-line">
             {ending.map((c) => {
-              const n = daysUntil(today0, c.date_to);
+              const n = daysUntil(today0, c.ends_on);
               return (
-                <li key={c.employee_id + c.date_to}>
+                <li key={c.employee_id + c.ends_on}>
                   <Link href={`/admin/employees/${c.employee_id}#contract`} className="flex items-center justify-between gap-3 py-2.5 text-sm hover:text-brand">
                     <span className="font-semibold text-ink">{c.profiles?.full_name}</span>
                     <span className={n <= 7 ? "font-semibold text-warning" : "text-body"}>
-                      {formatDate(c.date_to)} · {n === 0 ? "today" : `in ${n} day${n === 1 ? "" : "s"}`}
+                      {formatDate(c.ends_on)} · {n < 0 ? `ended ${-n} day${n === -1 ? "" : "s"} ago` : n === 0 ? "today" : `in ${n} day${n === 1 ? "" : "s"}`}
                     </span>
                   </Link>
                 </li>

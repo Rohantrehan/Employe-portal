@@ -35,6 +35,12 @@ function NewEmployeeFormInner({ departments, onAddAnother }: { departments: Depa
           <div className="mt-6">
             <CredentialsPanel email={email} password={password} />
           </div>
+          <p className="mt-5 rounded-2xl bg-soft px-4 py-3 text-[13px] text-body">
+            <b className="text-ink">Already works here on a paper contract?</b> Record that contract and the paid leave they have left:{" "}
+            <Link href={`/admin/employees/${id}#contract-leave`} className="font-semibold text-brand hover:underline">
+              Record existing contract
+            </Link>
+          </p>
           <div className="mt-6 flex flex-wrap gap-2">
             <Link href={`/admin/employees/${id}`} className={buttonClass("primary")}>
               View employee <ArrowRight className="h-4 w-4" />

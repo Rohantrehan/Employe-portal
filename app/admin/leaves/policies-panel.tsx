@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/cn";
 import type { LeaveType } from "@/lib/leave";
-import { saveLeaveType, setQuota } from "./actions";
+import { saveLeaveType, setContractQuota, setQuota } from "./actions";
 
 const COLORS = ["#0069a4", "#15803d", "#b45309", "#6b7280", "#d4000f", "#7c3aed", "#db2777", "#0d9488"];
 
@@ -24,7 +24,7 @@ export function PoliciesPanel({ types, policies, year }: { types: LeaveType[]; p
     <Card className="overflow-hidden">
       <CardHeader
         title={`Leave types & quotas · ${year}`}
-        description="The quota is how many days each employee gets for the year. Unused days don't carry forward."
+        description="Each type with a limit is either per year (unused days don't carry forward) or per contract (every contract gets the days, unused ones carry over on renewal)."
         action={
           <Button size="sm" onClick={() => setTypeFor("new")}>
             <Plus className="h-4 w-4" /> Add leave type
@@ -47,6 +47,7 @@ export function PoliciesPanel({ types, policies, year }: { types: LeaveType[]; p
                   <Badge tone={t.is_paid ? "success" : "neutral"}>{t.is_paid ? "Paid" : "Unpaid"}</Badge>
                   {!t.tracks_balance && <Badge tone="info">No limit</Badge>}
                   {t.requires_attachment && <Badge tone="warning">Document required</Badge>}
+                  {t.tracks_balance && t.contract_quota != null && <Badge tone="dark">Follows the contract</Badge>}
                 </div>
               </div>
               {t.tracks_balance && (
@@ -57,8 +58,8 @@ export function PoliciesPanel({ types, policies, year }: { types: LeaveType[]; p
                   className="group flex cursor-pointer items-center gap-3 rounded-2xl border border-line px-4 py-2 text-left transition-colors hover:border-brand hover:bg-tint-2 disabled:cursor-not-allowed"
                 >
                   <span>
-                    <span className="block text-[11px] font-bold uppercase tracking-wider text-body">Days / year</span>
-                    <span className="block text-xl font-extrabold tabular-nums text-ink">{q ?? "—"}</span>
+                    <span className="block text-[11px] font-bold uppercase tracking-wider text-body">{t.contract_quota != null ? "Days / contract" : "Days / year"}</span>
+                    <span className="block text-xl font-extrabold tabular-nums text-ink">{t.contract_quota != null ? Number(t.contract_quota) : (q ?? "—")}</span>
                   </span>
                   <Pencil className="h-4 w-4 text-body group-hover:text-brand" />
                 </button>
@@ -80,16 +81,27 @@ export function PoliciesPanel({ types, policies, year }: { types: LeaveType[]; p
 function QuotaModal({ type, current, year, onClose }: { type: LeaveType; current: number; year: number; onClose: () => void }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [value, setValue] = useState(String(current));
+  const [mode, setMode] = useState<"year" | "contract">(type.contract_quota != null ? "contract" : "year");
+  const [value, setValue] = useState(String(type.contract_quota != null ? Number(type.contract_quota) : current));
   const [applyAll, setApplyAll] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const save = () =>
     start(async () => {
       setError(null);
-      const res = await setQuota(type.id, year, Number(value), applyAll);
-      if (!res.ok) return setError(res.error);
-      toast.success(`${type.name}: ${value} days for ${year}`);
+      if (mode === "contract") {
+        const res = await setContractQuota(type.id, Number(value));
+        if (!res.ok) return setError(res.error);
+        toast.success(`${type.name}: ${value} days per contract`);
+      } else {
+        if (type.contract_quota != null) {
+          const r1 = await setContractQuota(type.id, null);
+          if (!r1.ok) return setError(r1.error);
+        }
+        const res = await setQuota(type.id, year, Number(value), applyAll);
+        if (!res.ok) return setError(res.error);
+        toast.success(`${type.name}: ${value} days for ${year}`);
+      }
       onClose();
       router.refresh();
     });
@@ -99,7 +111,7 @@ function QuotaModal({ type, current, year, onClose }: { type: LeaveType; current
       open
       size="sm"
       onClose={() => !pending && onClose()}
-      title={`${type.name} quota · ${year}`}
+      title={`${type.name} quota`}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={pending}>
@@ -111,14 +123,53 @@ function QuotaModal({ type, current, year, onClose }: { type: LeaveType; current
         </>
       }
     >
-      <Input label="Days per employee" type="number" inputMode="decimal" min={0} max={365} step="0.5" value={value} onChange={(e) => setValue(e.target.value)} error={error ?? undefined} />
-      <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl border border-line px-4 py-3">
-        <input type="checkbox" checked={applyAll} onChange={(e) => setApplyAll(e.target.checked)} className="mt-1 accent-[#d4000f]" />
-        <span>
-          <span className="block text-sm font-semibold text-ink">Apply to all current employees</span>
-          <span className="block text-[13px] text-body">Resets everyone&apos;s {year} allotment to this number, replacing individual changes. Otherwise it only applies to new employees.</span>
-        </span>
-      </label>
+      <div className="mb-4 grid grid-cols-2 gap-2" role="radiogroup" aria-label="How the days are given">
+        {(
+          [
+            ["contract", "Per contract", "Every contract gets the days. Unused ones carry over on renewal."],
+            ["year", "Per year", `Days for ${year}. Unused ones don't carry forward.`],
+          ] as const
+        ).map(([m, label, hint]) => (
+          <button
+            key={m}
+            type="button"
+            role="radio"
+            aria-checked={mode === m}
+            onClick={() => {
+              setMode(m);
+              setValue(String(m === "contract" ? (type.contract_quota != null ? Number(type.contract_quota) : 12) : current));
+            }}
+            className={cn(
+              "cursor-pointer rounded-2xl border px-3 py-2.5 text-left transition",
+              mode === m ? "border-ink bg-soft" : "border-line hover:bg-soft",
+            )}
+          >
+            <span className="block text-sm font-semibold text-ink">{label}</span>
+            <span className="block text-[12px] leading-snug text-body">{hint}</span>
+          </button>
+        ))}
+      </div>
+      <Input
+        label={mode === "contract" ? "Days per contract" : `Days per employee in ${year}`}
+        type="number"
+        inputMode="decimal"
+        min={0}
+        max={365}
+        step="0.5"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        error={error ?? undefined}
+        hint={mode === "contract" ? "Same for 3-month, 6-month and 1-year contracts. Updates contracts that haven't ended, except ones HR set by hand. People without a contract keep the yearly days." : undefined}
+      />
+      {mode === "year" && (
+        <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl border border-line px-4 py-3">
+          <input type="checkbox" checked={applyAll} onChange={(e) => setApplyAll(e.target.checked)} className="mt-1 accent-[#d4000f]" />
+          <span>
+            <span className="block text-sm font-semibold text-ink">Apply to all current employees</span>
+            <span className="block text-[13px] text-body">Resets everyone&apos;s {year} allotment to this number, replacing individual changes. Otherwise it only applies to new employees.</span>
+          </span>
+        </label>
+      )}
     </Modal>
   );
 }
@@ -150,7 +201,7 @@ function TypeModal({ type, year, onClose }: { type: LeaveType | null; year: numb
 
   const toggles: { key: "is_paid" | "tracks_balance" | "requires_attachment" | "is_active"; label: string; hint: string }[] = [
     { key: "is_paid", label: "Paid", hint: "Salary is not cut for these days." },
-    { key: "tracks_balance", label: "Has a yearly limit", hint: "Off = unlimited, like Unpaid Leave." },
+    { key: "tracks_balance", label: "Has a limit", hint: "Off = unlimited, like Unpaid Leave. Set the days with the quota button." },
     { key: "requires_attachment", label: "Document required", hint: "e.g. a medical certificate." },
     { key: "is_active", label: "Available to employees", hint: "Hide it to stop new requests. History is kept." },
   ];

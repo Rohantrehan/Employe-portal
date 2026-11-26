@@ -395,6 +395,11 @@ function HireEditor({
             ))}
           </div>
         )}
+        {kind === "contract" && latest && (
+          <p className="rounded-2xl bg-soft px-4 py-2.5 text-[13px] text-body">
+            When this is issued, the unused paid leave from the earlier contract carries over to it automatically.
+          </p>
+        )}
         <div>
           <Textarea
             label="Letter text"

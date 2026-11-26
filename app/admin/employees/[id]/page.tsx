@@ -12,6 +12,8 @@ import { EditEmployeeForm } from "./edit-employee-form";
 import { AccountActions } from "./account-actions";
 import { HirePanel } from "./hire-panel";
 import { AccessCard } from "./access-card";
+import { ContractLeavePanel, type ContractType, type PanelBalance, type PanelContract } from "./contract-leave-panel";
+import { balancesOn, periodText, total, usable } from "@/lib/leave";
 import { ChecklistPanel, type Milestone } from "./checklist-panel";
 import { contractClass, ITEM_COLUMNS, TASK_COLUMNS, type ChecklistItem, type Task } from "@/lib/checklists";
 import { ExitPanel, type AdminLetter, type ExitInfo, type FinalPayslip, type LetterEvent } from "./exit-panel";
@@ -23,18 +25,14 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const { supabase, profile: me } = await requireRole("admin");
 
-  const [{ data: emp }, { data: departments }, { data: balances }, { data: exit }, { data: letters }, { data: events }, { data: settings }, { count: signatures }, { data: tasks }, { data: items }, { data: milestones }, { data: vaultGrants }] = await Promise.all([
+  const [{ data: emp }, { data: departments }, balances, { data: exit }, { data: letters }, { data: events }, { data: settings }, { count: signatures }, { data: tasks }, { data: items }, { data: milestones }, { data: vaultGrants }, { data: contractRows }, { data: contractBalances }, { data: contractTypes }, { data: leaveTypes }] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, emp_code, full_name, email, phone, designation, department_id, date_of_joining, basic_salary, role, schedule, shift_start, shift_end, is_active, must_change_password, avatar_url, created_at, left_on, former_access, linkedin_url, departments(name)")
       .eq("id", id)
       .maybeSingle(),
     supabase.from("departments").select("id, name").order("name"),
-    supabase
-      .from("leave_balances")
-      .select("allotted, carried, used, pending, year, leave_types(name, color, sort_order)")
-      .eq("employee_id", id)
-      .eq("year", new Date().getFullYear()),
+    balancesOn(supabase, todayIST(), id),
     supabase.from("employee_exits").select("last_day, reason, conduct, letters_allowed, note").eq("employee_id", id).maybeSingle(),
     supabase
       .from("letters")
@@ -53,7 +51,33 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
     supabase.from("checklist_items").select(ITEM_COLUMNS).order("sort_order"),
     supabase.from("linkedin_milestones").select("years, status, post_url, created_at").eq("employee_id", id).order("years"),
     supabase.from("vault_grants").select("item:vault_items!inner(id, name)").eq("employee_id", id).is("revoked_at", null),
+    supabase.from("contracts").select("id, starts_on, ends_on, source, note, letters(ref_no)").eq("employee_id", id),
+    supabase
+      .from("leave_balances")
+      .select("id, contract_id, leave_type_id, allotted, carried, used, pending, used_before, set_by_hr, carried_from")
+      .eq("employee_id", id)
+      .not("contract_id", "is", null),
+    supabase.from("leave_types").select("id, name, color, contract_quota").eq("tracks_balance", true).eq("is_active", true).not("contract_quota", "is", null).order("sort_order"),
+    supabase.from("leave_types").select("id, name, color, sort_order").order("sort_order"),
   ]);
+  const panelContracts: PanelContract[] = (contractRows ?? []).map((c) => ({
+    id: c.id,
+    starts_on: c.starts_on,
+    ends_on: c.ends_on,
+    source: c.source as PanelContract["source"],
+    note: c.note,
+    ref_no: (c.letters as unknown as { ref_no: string | null } | null)?.ref_no ?? null,
+  }));
+  const num = (v: unknown) => Number(v ?? 0);
+  const panelBalances: PanelBalance[] = (contractBalances ?? []).map((b) => ({
+    ...b,
+    allotted: num(b.allotted),
+    carried: num(b.carried),
+    used: num(b.used),
+    pending: num(b.pending),
+    used_before: num(b.used_before),
+  }));
+  const panelTypes: ContractType[] = (contractTypes ?? []).map((t) => ({ ...t, contract_quota: num(t.contract_quota) }));
   const accessItems = (vaultGrants ?? [])
     .map((g) => g.item as unknown as { id: string; name: string })
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -87,8 +111,9 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
     actor: (e.actor as unknown as { full_name: string } | null)?.full_name ?? null,
   }));
   const dept = (emp.departments as unknown as { name: string } | null)?.name;
-  const sortedBalances = (balances ?? [])
-    .map((b) => ({ ...b, type: b.leave_types as unknown as { name: string; color: string; sort_order: number } }))
+  const sortedBalances = balances
+    .filter((b) => b.balance_id)
+    .map((b) => ({ ...b, type: (leaveTypes ?? []).find((t) => t.id === b.leave_type_id) ?? { name: "Leave", color: "#6b7280", sort_order: 99 } }))
     .sort((a, b) => a.type.sort_order - b.type.sort_order);
 
   return (
@@ -168,6 +193,18 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
             today={today}
           />
         </div>
+        {emp.role === "employee" && (
+          <div id="contract-leave">
+            <ContractLeavePanel
+              employeeId={emp.id}
+              firstName={firstName}
+              contracts={panelContracts}
+              balances={panelBalances}
+              types={panelTypes}
+              today={today}
+            />
+          </div>
+        )}
         {(!exit || allTasks.some((t) => t.kind === "onboarding")) && (
         <div id="onboarding">
           <ChecklistPanel
@@ -240,21 +277,23 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
           </Card>
 
           <Card>
-            <CardHeader title={`Leave balance ${new Date().getFullYear()}`} description="Unpaid leave has no limit." />
+            <CardHeader title="Leave balance" description="Unpaid leave has no limit." />
             <CardBody className="space-y-4">
-              {sortedBalances.length === 0 && <p className="text-sm text-body">No balances for this year{emp.role === "admin" ? " (admins don't get them automatically)" : ""}.</p>}
+              {sortedBalances.length === 0 && <p className="text-sm text-body">No balances yet{emp.role === "admin" ? " (admins don't get them automatically)" : ""}.</p>}
               {sortedBalances.map((b) => {
-                const total = Number(b.allotted) + Number(b.carried);
-                const left = total - Number(b.used) - Number(b.pending);
-                const pct = total > 0 ? Math.min(100, (Number(b.used) / total) * 100) : 0;
+                const tot = total(b);
+                const left = usable(b);
+                const pct = tot > 0 ? Math.min(100, (Number(b.used) / tot) * 100) : 0;
+                const period = periodText(b);
                 return (
-                  <div key={b.type.name}>
+                  <div key={b.leave_type_id}>
                     <div className="flex items-baseline justify-between text-sm">
                       <span className="font-semibold text-ink">{b.type.name}</span>
                       <span className="text-body">
-                        <b className="text-ink">{left}</b> of {total} left
+                        <b className="text-ink">{left}</b> of {tot} left
                       </span>
                     </div>
+                    {period && <p className="text-[12px] text-body">{period}</p>}
                     <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-grey-tile">
                       <div className="h-full rounded-full" style={{ width: `${pct}%`, background: b.type.color }} />
                     </div>

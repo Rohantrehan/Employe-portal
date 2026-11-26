@@ -77,6 +77,23 @@ export async function setAllotment(balanceId: string, value: number): Promise<Re
   return { ok: true };
 }
 
+/** Per contract (a number of days for every contract) or per calendar year (null). */
+export async function setContractQuota(typeId: string, value: number | null): Promise<Result> {
+  const { supabase } = await requireRole("admin");
+  let v: number | null = null;
+  if (value !== null) {
+    const q = quota.safeParse(value);
+    if (!q.success) return { ok: false, error: q.error.issues[0].message };
+    v = q.data;
+  }
+  const { error } = await supabase.rpc("set_contract_quota", { p_type: typeId, p_quota: v });
+  if (error) return { ok: false, error: msg(error, "Could not save.") };
+  revalidate();
+  revalidatePath("/admin/employees", "layout");
+  revalidatePath("/app");
+  return { ok: true };
+}
+
 const typeSchema = z.object({
   name: z.string().trim().min(2, "Enter a name").max(40),
   code: z.string().trim().toUpperCase().regex(/^[A-Z]{2,6}$/, "2–6 capital letters, e.g. ML"),
