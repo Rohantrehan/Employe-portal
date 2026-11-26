@@ -11,6 +11,7 @@ import { formatDate, formatINR, formatPhone, todayIST } from "@/lib/format";
 import { EditEmployeeForm } from "./edit-employee-form";
 import { AccountActions } from "./account-actions";
 import { HirePanel } from "./hire-panel";
+import { AccessCard } from "./access-card";
 import { ChecklistPanel, type Milestone } from "./checklist-panel";
 import { contractClass, ITEM_COLUMNS, TASK_COLUMNS, type ChecklistItem, type Task } from "@/lib/checklists";
 import { ExitPanel, type AdminLetter, type ExitInfo, type FinalPayslip, type LetterEvent } from "./exit-panel";
@@ -22,7 +23,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const { supabase, profile: me } = await requireRole("admin");
 
-  const [{ data: emp }, { data: departments }, { data: balances }, { data: exit }, { data: letters }, { data: events }, { data: settings }, { count: signatures }, { data: tasks }, { data: items }, { data: milestones }] = await Promise.all([
+  const [{ data: emp }, { data: departments }, { data: balances }, { data: exit }, { data: letters }, { data: events }, { data: settings }, { count: signatures }, { data: tasks }, { data: items }, { data: milestones }, { data: vaultGrants }] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, emp_code, full_name, email, phone, designation, department_id, date_of_joining, basic_salary, role, schedule, shift_start, shift_end, is_active, must_change_password, avatar_url, created_at, left_on, former_access, linkedin_url, departments(name)")
@@ -51,7 +52,11 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
     supabase.from("employee_tasks").select(TASK_COLUMNS).eq("employee_id", id),
     supabase.from("checklist_items").select(ITEM_COLUMNS).order("sort_order"),
     supabase.from("linkedin_milestones").select("years, status, post_url, created_at").eq("employee_id", id).order("years"),
+    supabase.from("vault_grants").select("item:vault_items!inner(id, name)").eq("employee_id", id).is("revoked_at", null),
   ]);
+  const accessItems = (vaultGrants ?? [])
+    .map((g) => g.item as unknown as { id: string; name: string })
+    .sort((a, b) => a.name.localeCompare(b.name));
   if (!emp) notFound();
 
   const isMe = emp.id === me.id;
@@ -258,6 +263,8 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
               })}
             </CardBody>
           </Card>
+
+          {emp.role === "employee" && <AccessCard employeeId={emp.id} items={accessItems} leaving={!!emp.left_on} />}
 
           <AccountActions id={emp.id} name={emp.full_name} isActive={emp.is_active} isMe={isMe} hasExit={!!exit} formerAccess={emp.former_access} twoFactor={twoFactor} />
         </div>

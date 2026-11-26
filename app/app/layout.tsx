@@ -9,16 +9,19 @@ export const dynamic = "force-dynamic";
 
 export default async function EmployeeLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
-  const [{ profile }, { data: shiftData }, { data: steps }, { data: reqs }] = await Promise.all([
+  const [{ profile }, { data: shiftData }, { data: steps }, { data: reqs }, { count: grants }] = await Promise.all([
     requireRole("employee"),
     supabase.rpc("my_shift"),
     // RLS: only this employee's onboarding steps.
     supabase.from("employee_tasks").select("owner, done_at").eq("kind", "onboarding"),
     // RLS: only this employee's requests. Badge = HR replies they haven't opened.
     supabase.from("hr_requests").select("last_admin_at, employee_seen_at").not("last_admin_at", "is", null),
+    // RLS: only their own live grants. "My access" shows only when they have one.
+    supabase.from("vault_grants").select("id", { count: "exact", head: true }),
   ]);
   // "Getting started" shows once onboarding has begun; the badge counts the steps they still have to do.
   const badges: Record<string, number> = { "/app/requests": (reqs ?? []).filter(unreadForEmployee).length };
+  if (grants) badges["/app/access"] = 0;
   if (steps?.length) badges["/app/setup"] = steps.filter((t) => t.owner === "employee" && !t.done_at).length;
   const shift = shiftData as MyShift | null;
   // RLS returns only this employee's rows. A night shift keeps the date it started on.

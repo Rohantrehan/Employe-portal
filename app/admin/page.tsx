@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowUpRight, ListChecks, BriefcaseBusiness, CalendarClock, ClipboardCheck, FileSignature, Palmtree, UserX, Users } from "lucide-react";
+import { ArrowUpRight, KeyRound, ListChecks, BriefcaseBusiness, CalendarClock, ClipboardCheck, FileSignature, Palmtree, UserX, Users } from "lucide-react";
 import { BarChart } from "@/components/charts/bar-chart";
 import { BarList, ChartCard, Headline } from "@/components/charts/chart-card";
 import { SERIES, formatValue } from "@/components/charts/chart-utils";
@@ -35,7 +35,7 @@ const sum = (xs: number[]) => xs.reduce((a, b) => a + Number(b), 0);
 
 export default async function AdminDashboard() {
   const { supabase, profile } = await requireRole("admin");
-  const [{ data, error }, { count: fixCount }, { data: contractRows }, { data: taskRows }] = await Promise.all([
+  const [{ data, error }, { count: fixCount }, { data: contractRows }, { data: taskRows }, { data: rotation }] = await Promise.all([
     supabase.rpc("admin_dashboard"),
     supabase.from("clockout_fix_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
     supabase
@@ -45,7 +45,9 @@ export default async function AdminDashboard() {
       .eq("status", "issued")
       .gte("date_to", todayIST()),
     supabase.from("employee_tasks").select("employee_id, kind, owner, done_at, profiles!employee_tasks_employee_id_fkey(full_name)"),
+    supabase.rpc("vault_rotation_needed"),
   ]);
+  const toRotate = (rotation ?? []) as { item_id: string; name: string; people: string[] }[];
   // Onboarding / offboarding lists that still have open steps.
   type TRow = { employee_id: string; kind: "onboarding" | "offboarding"; owner: string; done_at: string | null; profiles: { full_name: string } | null };
   const openLists = Object.values(
@@ -159,6 +161,26 @@ export default async function AdminDashboard() {
                 </li>
               );
             })}
+          </ul>
+        </section>
+      )}
+
+      {toRotate.length > 0 && (
+        <section aria-label="Passwords to change" className="card mt-6 p-5 sm:p-6">
+          <div className="flex items-center gap-2">
+            <KeyRound className="h-[18px] w-[18px] text-warning" />
+            <h2 className="text-base font-bold tracking-[-0.01em] text-ink">Passwords to change</h2>
+          </div>
+          <p className="mt-0.5 text-sm text-body">Someone who saw these passwords no longer has access.</p>
+          <ul className="mt-3 divide-y divide-line">
+            {toRotate.map((r) => (
+              <li key={r.item_id}>
+                <Link href={`/admin/access/${r.item_id}`} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2.5 text-sm hover:text-brand">
+                  <span className="font-semibold text-ink">{r.name}</span>
+                  <span className="text-body">seen by {r.people.join(", ")}</span>
+                </Link>
+              </li>
+            ))}
           </ul>
         </section>
       )}

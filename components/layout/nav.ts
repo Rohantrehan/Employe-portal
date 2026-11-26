@@ -1,6 +1,7 @@
 import {
   FileSignature,
   ListChecks,
+  KeyRound,
   MessageSquareText,
   CalendarDays,
   CalendarHeart,
@@ -43,6 +44,7 @@ export const NAV: Record<Area, NavGroup[]> = {
       items: [
         { href: "/admin/holidays", label: "Holidays", icon: CalendarHeart },
         { href: "/admin/payroll", label: "Payroll", icon: Wallet },
+        { href: "/admin/access", label: "Access manager", icon: KeyRound },
         { href: "/admin/settings", label: "Settings", icon: Settings },
       ],
     },
@@ -67,6 +69,7 @@ export const NAV: Record<Area, NavGroup[]> = {
       items: [
         { href: "/app/setup", label: "Getting started", icon: ListChecks, optional: true },
         { href: "/app/requests", label: "Requests to HR", icon: MessageSquareText },
+        { href: "/app/access", label: "My access", icon: KeyRound, optional: true },
         { href: "/app/documents", label: "Documents", icon: FileSignature },
         { href: "/app/payslips", label: "Payslips", icon: FileText },
         { href: "/app/profile", label: "Profile", icon: UserRound },
