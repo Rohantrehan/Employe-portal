@@ -16,11 +16,12 @@ export default async function DocumentsPage() {
   const { supabase, profile } = await requireRole("employee");
   const today = todayIST();
 
-  // RLS returns only this employee's letters, never drafts.
+  // Only this person's letters, never drafts (HR could otherwise see drafts through admin rights).
   const { data } = await supabase
     .from("letters")
     .select("id, kind, status, ref_no, issue_date, cancelled_at, designation, department, date_from, date_to, salary")
     .eq("employee_id", profile.id)
+    .neq("status", "draft")
     .order("issue_date", { ascending: false });
   const letters = ((data ?? []) as Row[]).map((l) => ({ ...l, salary: l.salary == null ? null : Number(l.salary) }));
 

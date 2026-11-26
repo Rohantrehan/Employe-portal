@@ -18,9 +18,14 @@ export type Profile = {
   must_change_password: boolean;
   left_on: string | null;
   former_access: boolean;
+  /** An employee who also has full admin rights (and clocks in like everyone else). */
+  is_hr: boolean;
 };
 
-export const homeFor = (role: Role) => (role === "admin" ? "/admin" : "/app");
+/** Admin panel access: admins and HR. */
+export const hasAdminRights = (p: Pick<Profile, "role" | "is_hr">) => p.role === "admin" || (p.role === "employee" && p.is_hr);
+
+export const homeFor = (p: Pick<Profile, "role" | "is_hr">) => (hasAdminRights(p) ? "/admin" : "/app");
 
 /**
  * Current user + profile, cached for the duration of one request.
@@ -38,7 +43,7 @@ export const getSession = cache(async () => {
   const aal = (claims.aal as string | undefined) ?? "aal1";
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role, emp_code, full_name, email, designation, avatar_url, is_active, must_change_password, left_on, former_access")
+    .select("id, role, emp_code, full_name, email, designation, avatar_url, is_active, must_change_password, left_on, former_access, is_hr")
     .eq("id", user.id)
     .single<Profile>();
   return { user, profile, supabase, aal };
@@ -51,7 +56,7 @@ export const getSession = cache(async () => {
  * - inactive or no profile → /login?error=inactive
  * - admin without the authenticator-app step → /mfa
  * - must change password → /change-password
- * - wrong role → that role's home
+ * - wrong role → that role's home (HR may use both areas)
  */
 export async function requireRole(role: Role) {
   const session = await getSession();
@@ -60,9 +65,10 @@ export async function requireRole(role: Role) {
   // Past their last working day → documents-only area (or out, if the admin turned that off).
   if (profile && isFormer(profile)) redirect(profile.former_access ? "/former" : "/auth/logout?reason=inactive");
   if (!profile || !profile.is_active) redirect("/auth/logout?reason=inactive");
-  if (profile.role === "admin" && session.aal !== "aal2") redirect("/mfa");
+  if (hasAdminRights(profile) && session.aal !== "aal2") redirect("/mfa");
   if (profile.must_change_password) redirect("/change-password");
-  if (profile.role !== role) redirect(homeFor(profile.role));
+  const allowed = role === "admin" ? hasAdminRights(profile) : profile.role === "employee";
+  if (!allowed) redirect(homeFor(profile));
   return { ...session, profile };
 }
 
@@ -77,7 +83,7 @@ export async function requireFormer() {
   if (!session) redirect("/login");
   const { profile } = session;
   if (!profile) redirect("/auth/logout?reason=inactive");
-  if (!isFormer(profile)) redirect(profile.is_active ? homeFor(profile.role) : "/auth/logout?reason=inactive");
+  if (!isFormer(profile)) redirect(profile.is_active ? homeFor(profile) : "/auth/logout?reason=inactive");
   if (!profile.former_access) redirect("/auth/logout?reason=inactive");
   if (profile.must_change_password) redirect("/change-password");
   return { ...session, profile };

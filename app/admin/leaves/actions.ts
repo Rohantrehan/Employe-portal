@@ -62,11 +62,12 @@ export async function setQuota(typeId: string, year: number, value: number, appl
 
 /** Override one employee's allotment for one type/year. */
 export async function setAllotment(balanceId: string, value: number): Promise<Result> {
-  const { supabase } = await requireRole("admin");
+  const { supabase, profile: me } = await requireRole("admin");
   const q = quota.safeParse(value);
   if (!q.success) return { ok: false, error: q.error.issues[0].message };
-  const { data: b } = await supabase.from("leave_balances").select("used, pending").eq("id", balanceId).single();
+  const { data: b } = await supabase.from("leave_balances").select("used, pending, employee_id").eq("id", balanceId).single();
   if (!b) return { ok: false, error: "Balance not found." };
+  if (b.employee_id === me.id) return { ok: false, error: "You can't change your own leave. Another admin has to." };
   if (q.data < Number(b.used) + Number(b.pending)) {
     return { ok: false, error: `Can't go below ${Number(b.used) + Number(b.pending)}: that much is already used or pending.` };
   }

@@ -30,9 +30,9 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, is_active, must_change_password, left_on, former_access")
+    .select("role, is_hr, is_active, must_change_password, left_on, former_access")
     .eq("id", data.user.id)
-    .single<{ role: Role; is_active: boolean; must_change_password: boolean; left_on: string | null; former_access: boolean }>();
+    .single<{ role: Role; is_hr: boolean; is_active: boolean; must_change_password: boolean; left_on: string | null; former_access: boolean }>();
 
   // People who have left can still log in to download their letters and payslips, if the admin allows it.
   if (profile && isFormer(profile)) {
@@ -46,7 +46,7 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
     return { error: "This account has been deactivated. Please contact your admin." };
   }
 
-  redirect(profile.must_change_password ? "/change-password" : homeFor(profile.role));
+  redirect(profile.must_change_password ? "/change-password" : homeFor(profile));
 }
 
 const passwordSchema = z
@@ -82,6 +82,6 @@ export async function changePassword(_prev: FormState, formData: FormData): Prom
   }
 
   await supabase.rpc("mark_password_changed");
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single<{ role: Role }>();
-  redirect(homeFor(profile?.role ?? "employee"));
+  const { data: profile } = await supabase.from("profiles").select("role, is_hr").eq("id", user.id).single<{ role: Role; is_hr: boolean }>();
+  redirect(profile ? homeFor(profile) : "/app");
 }

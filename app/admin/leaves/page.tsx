@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: "Leave" };
 type Tab = "requests" | "balances" | "types";
 
 export default async function AdminLeavesPage({ searchParams }: { searchParams: Promise<{ tab?: string; year?: string }> }) {
-  const { supabase } = await requireRole("admin");
+  const { supabase, profile: me } = await requireRole("admin");
   const today = todayIST();
   const thisYear = Number(today.slice(0, 4));
   const sp = await searchParams;
@@ -103,7 +103,7 @@ export default async function AdminLeavesPage({ searchParams }: { searchParams: 
       </div>
 
       <div className="mt-4">
-        {tab === "requests" && <RequestsPanel requests={requests} types={allTypes} today={today} />}
+        {tab === "requests" && <RequestsPanel requests={requests} types={allTypes} today={today} meId={me.id} />}
         {tab === "balances" && <BalancesPanel rows={balances} types={allTypes.filter((t) => t.tracks_balance && t.is_active)} year={year} />}
         {tab === "types" && <PoliciesPanel types={allTypes} policies={policies} year={year} />}
       </div>

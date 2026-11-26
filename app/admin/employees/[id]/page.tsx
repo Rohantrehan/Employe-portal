@@ -28,7 +28,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
   const [{ data: emp }, { data: departments }, balances, { data: exit }, { data: letters }, { data: events }, { data: settings }, { count: signatures }, { data: tasks }, { data: items }, { data: milestones }, { data: vaultGrants }, { data: contractRows }, { data: contractBalances }, { data: contractTypes }, { data: leaveTypes }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, emp_code, full_name, email, phone, designation, department_id, date_of_joining, basic_salary, role, schedule, shift_start, shift_end, is_active, must_change_password, avatar_url, created_at, left_on, former_access, linkedin_url, departments(name)")
+      .select("id, emp_code, full_name, email, phone, designation, department_id, date_of_joining, basic_salary, role, schedule, shift_start, shift_end, is_active, must_change_password, avatar_url, created_at, left_on, former_access, linkedin_url, is_hr, departments(name)")
       .eq("id", id)
       .maybeSingle(),
     supabase.from("departments").select("id, name").order("name"),
@@ -87,7 +87,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
   const allLetters = ((letters ?? []) as AdminLetter[]).map((l) => ({ ...l, salary: l.salary == null ? null : Number(l.salary) }));
   // Other admins: has 2-step sign-in been set up? (factors are only visible with the service key)
   let twoFactor: boolean | null = null;
-  if (emp.role === "admin" && !isMe) {
+  if ((emp.role === "admin" || emp.is_hr) && !isMe) {
     const { data: f } = await createAdminClient().auth.admin.mfa.listFactors({ userId: emp.id });
     twoFactor = !!f?.factors.some((x) => x.status === "verified");
   }
@@ -141,6 +141,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
               <Badge>Deactivated</Badge>
             )}
             {emp.role === "admin" && <Badge tone="dark">Admin</Badge>}
+            {emp.is_hr && <Badge tone="dark">HR</Badge>}
             {emp.must_change_password && emp.is_active && <Badge tone="warning">Hasn&apos;t set password yet</Badge>}
           </div>
           <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-body">
@@ -167,7 +168,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
             department_id: emp.department_id,
             date_of_joining: emp.date_of_joining,
             basic_salary: Number(emp.basic_salary),
-            role: emp.role,
+            role: emp.role === "admin" ? "admin" : emp.is_hr ? "hr" : "employee",
             schedule: emp.schedule,
             shift_start: emp.shift_start,
             shift_end: emp.shift_end,

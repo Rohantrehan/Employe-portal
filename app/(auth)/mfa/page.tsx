@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Eyebrow } from "@/components/ui/misc";
-import { getSession, homeFor } from "@/lib/auth";
+import { getSession, hasAdminRights, homeFor } from "@/lib/auth";
 import { AuthFrame } from "../auth-frame";
 import { MfaSetup, MfaVerify } from "./mfa-form";
 
@@ -12,7 +12,7 @@ export default async function MfaPage() {
   if (!session) redirect("/login");
   const { profile, supabase, aal } = session;
   if (!profile || !profile.is_active) redirect("/auth/logout?reason=inactive");
-  if (profile.role !== "admin") redirect(homeFor(profile.role));
+  if (!hasAdminRights(profile)) redirect(homeFor(profile));
 
   const { data } = await supabase.auth.mfa.listFactors();
   const factor = data?.all.find((f) => f.factor_type === "totp" && f.status === "verified");

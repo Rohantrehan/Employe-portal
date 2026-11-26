@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "My documents" };
 export default async function FormerHome() {
   const { supabase, profile } = await requireFormer();
   const [{ data: letters }, { data: slips }] = await Promise.all([
-    supabase.from("letters").select("id, kind, status, ref_no, issue_date, cancelled_at").eq("employee_id", profile.id).order("issue_date", { ascending: false }),
+    supabase.from("letters").select("id, kind, status, ref_no, issue_date, cancelled_at").eq("employee_id", profile.id).neq("status", "draft").order("issue_date", { ascending: false }),
     supabase.from("payslips").select("id, month, net_pay, payment_status, paid_on").eq("employee_id", profile.id).order("month", { ascending: false }),
   ]);
   const first = profile.full_name.split(" ")[0];

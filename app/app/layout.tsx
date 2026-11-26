@@ -9,24 +9,24 @@ export const dynamic = "force-dynamic";
 
 export default async function EmployeeLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
-  const [{ profile }, { data: shiftData }, { data: steps }, { data: reqs }, { count: grants }] = await Promise.all([
-    requireRole("employee"),
+  const { profile } = await requireRole("employee");
+  // Always filter by this person: HR also has admin rights, so RLS alone would return everyone's rows.
+  const [{ data: shiftData }, { data: steps }, { data: reqs }, { count: grants }] = await Promise.all([
     supabase.rpc("my_shift"),
-    // RLS: only this employee's onboarding steps.
-    supabase.from("employee_tasks").select("owner, done_at").eq("kind", "onboarding"),
-    // RLS: only this employee's requests. Badge = HR replies they haven't opened.
-    supabase.from("hr_requests").select("last_admin_at, employee_seen_at").not("last_admin_at", "is", null),
-    // RLS: only their own live grants. "My access" shows only when they have one.
-    supabase.from("vault_grants").select("id", { count: "exact", head: true }),
+    supabase.from("employee_tasks").select("owner, done_at").eq("employee_id", profile.id).eq("kind", "onboarding"),
+    // Badge = HR replies they haven't opened.
+    supabase.from("hr_requests").select("last_admin_at, employee_seen_at").eq("employee_id", profile.id).not("last_admin_at", "is", null),
+    // "My access" shows only when they have a live grant.
+    supabase.from("vault_grants").select("id", { count: "exact", head: true }).eq("employee_id", profile.id).is("revoked_at", null),
   ]);
   // "Getting started" shows once onboarding has begun; the badge counts the steps they still have to do.
   const badges: Record<string, number> = { "/app/requests": (reqs ?? []).filter(unreadForEmployee).length };
   if (grants) badges["/app/access"] = 0;
   if (steps?.length) badges["/app/setup"] = steps.filter((t) => t.owner === "employee" && !t.done_at).length;
   const shift = shiftData as MyShift | null;
-  // RLS returns only this employee's rows. A night shift keeps the date it started on.
+  // A night shift keeps the date it started on.
   const { data: open } = shift?.tracked
-    ? await supabase.from("attendance").select("clock_in").eq("work_date", shift.day).is("clock_out", null).neq("status", "missed_clock_out").maybeSingle()
+    ? await supabase.from("attendance").select("clock_in").eq("employee_id", profile.id).eq("work_date", shift.day).is("clock_out", null).neq("status", "missed_clock_out").maybeSingle()
     : { data: null };
 
   return (
@@ -37,8 +37,9 @@ export default async function EmployeeLayout({ children }: { children: React.Rea
         name: profile.full_name,
         email: profile.email,
         avatarUrl: profile.avatar_url,
-        subtitle: profile.designation ?? profile.emp_code,
+        subtitle: profile.is_hr ? "HR" : (profile.designation ?? profile.emp_code),
       }}
+      switchTo={profile.is_hr ? { href: "/admin", label: "Admin panel" } : undefined}
     >
       {open?.clock_in && shift && <ClockOutReminder date={shift.day} clockIn={open.clock_in} workEnd={shift.end} endsAt={shift.ends_at} />}
       {children}

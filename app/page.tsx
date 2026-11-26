@@ -6,5 +6,5 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const session = await getSession();
   if (!session?.profile) redirect("/login");
-  redirect(homeFor(session.profile.role));
+  redirect(homeFor(session.profile));
 }

@@ -19,6 +19,7 @@ export type EmployeeRow = {
   email: string;
   designation: string | null;
   role: "admin" | "employee";
+  is_hr: boolean;
   is_active: boolean;
   left_on: string | null;
   date_of_joining: string | null;
@@ -137,6 +138,7 @@ export function EmployeesTable({ employees, departments }: { employees: Employee
                       <div className="flex flex-wrap gap-1.5">
                         <StatusBadge e={e} />
                         {e.role === "admin" && <Badge tone="dark">Admin</Badge>}
+                        {e.is_hr && <Badge tone="dark">HR</Badge>}
                       </div>
                     </TD>
                     <TD className="text-body">

@@ -34,7 +34,7 @@ export type AdminRequest = {
   avatar: string | null;
 };
 
-export function RequestsPanel({ requests, types, today }: { requests: AdminRequest[]; types: LeaveType[]; today: string }) {
+export function RequestsPanel({ requests, types, today, meId }: { requests: AdminRequest[]; types: LeaveType[]; today: string; meId: string }) {
   const typeById = useMemo(() => Object.fromEntries(types.map((t) => [t.id, t])), [types]);
   const [decline, setDecline] = useState<{ req: AdminRequest; revoke: boolean } | null>(null);
   const [filter, setFilter] = useState<"all" | LeaveStatus>("all");
@@ -63,7 +63,7 @@ export function RequestsPanel({ requests, types, today }: { requests: AdminReque
           ) : (
             <ul className="divide-y divide-line">
               {pending.map((r) => (
-                <PendingRow key={r.id} r={r} type={typeById[r.typeId]} today={today} onReject={() => setDecline({ req: r, revoke: false })} onFile={openFile} />
+                <PendingRow key={r.id} r={r} mine={r.employeeId === meId} type={typeById[r.typeId]} today={today} onReject={() => setDecline({ req: r, revoke: false })} onFile={openFile} />
               ))}
             </ul>
           )}
@@ -121,7 +121,7 @@ export function RequestsPanel({ requests, types, today }: { requests: AdminReque
                       {r.reviewNote && <p className="mt-1 max-w-[220px] truncate text-xs text-body" title={r.reviewNote}>“{r.reviewNote}”</p>}
                     </TD>
                     <TD className="text-right">
-                      {r.status === "approved" && r.end >= today && (
+                      {r.status === "approved" && r.end >= today && r.employeeId !== meId && (
                         <Button size="sm" variant="ghost" onClick={() => setDecline({ req: r, revoke: true })}>
                           Revoke
                         </Button>
@@ -168,12 +168,14 @@ function addDays(d: string, n: number) {
 
 function PendingRow({
   r,
+  mine,
   type,
   today,
   onReject,
   onFile,
 }: {
   r: AdminRequest;
+  mine: boolean;
   type?: LeaveType;
   today: string;
   onReject: () => void;
@@ -215,12 +217,18 @@ function PendingRow({
             <FileText className="h-3.5 w-3.5" /> File
           </Button>
         )}
-        <Button size="sm" onClick={approve} loading={pending}>
-          <Check className="h-4 w-4" /> Approve
-        </Button>
-        <Button size="sm" variant="secondary" onClick={onReject} disabled={pending}>
-          <X className="h-4 w-4" /> Reject
-        </Button>
+        {mine ? (
+          <span className="self-center text-[13px] text-body">Your request: another admin reviews it.</span>
+        ) : (
+          <>
+            <Button size="sm" onClick={approve} loading={pending}>
+              <Check className="h-4 w-4" /> Approve
+            </Button>
+            <Button size="sm" variant="secondary" onClick={onReject} disabled={pending}>
+              <X className="h-4 w-4" /> Reject
+            </Button>
+          </>
+        )}
       </div>
     </li>
   );

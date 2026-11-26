@@ -11,6 +11,13 @@ export type ActionResult<T = undefined> =
   | { ok: true; data?: T; message?: string }
   | { ok: false; error?: string; fieldErrors?: Record<string, string> };
 
+/** Form access value → what is stored (profile role + HR flag, and the login's app_metadata). */
+function accessOf(access: "employee" | "hr" | "admin") {
+  const role = access === "admin" ? "admin" : "employee";
+  return { role, is_hr: access === "hr", meta: { role, hr: access === "hr" } } as const;
+}
+const accessLabel = (p: { role: string; is_hr?: boolean | null }) => (p.role === "admin" ? "admin" : p.is_hr ? "hr" : "employee");
+
 const BAN_FOREVER = "876000h"; // ~100 years
 
 function formToObject(formData: FormData) {
@@ -35,6 +42,7 @@ export async function createEmployee(
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrorsOf(parsed.error) };
   const input = parsed.data;
 
+  const access = accessOf(input.role);
   const admin = createAdminClient();
   const password = tempPassword();
   const { data: created, error: authError } = await admin.auth.admin.createUser({
@@ -42,7 +50,7 @@ export async function createEmployee(
     password,
     email_confirm: true,
     user_metadata: { full_name: input.full_name },
-    app_metadata: { role: input.role, must_change_password: true },
+    app_metadata: { ...access.meta, must_change_password: true },
   });
   if (authError || !created.user) {
     const exists = authError?.message.toLowerCase().includes("already");
@@ -62,7 +70,8 @@ export async function createEmployee(
       department_id: input.department_id ?? null,
       date_of_joining: input.date_of_joining ?? null,
       basic_salary: input.basic_salary,
-      role: input.role,
+      role: access.role,
+      is_hr: access.is_hr,
       schedule: input.schedule,
       shift_start: input.schedule === "custom" ? input.shift_start : null,
       shift_end: input.schedule === "custom" ? input.shift_end : null,
@@ -95,17 +104,17 @@ export async function updateEmployee(id: string, _prev: ActionResult | undefined
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrorsOf(parsed.error) };
   const input = parsed.data;
 
-  if (id === me.id && input.role !== "admin") {
-    return { ok: false, fieldErrors: { role: "You can't remove your own admin access" } };
-  }
-
-  const { data: current } = await supabase.from("profiles").select("email, role").eq("id", id).single();
+  const { data: current } = await supabase.from("profiles").select("email, role, is_hr").eq("id", id).single();
   if (!current) return { ok: false, error: "Employee not found." };
+  if (id === me.id && input.role !== accessLabel(current)) {
+    return { ok: false, fieldErrors: { role: "You can't change your own access" } };
+  }
+  const access = accessOf(input.role);
 
   const admin = createAdminClient();
   const authChanges: { email?: string; email_confirm?: boolean; app_metadata?: Record<string, unknown> } = {};
   if (input.email !== current.email) Object.assign(authChanges, { email: input.email, email_confirm: true });
-  if (input.role !== current.role) authChanges.app_metadata = { role: input.role };
+  if (input.role !== accessLabel(current)) authChanges.app_metadata = access.meta;
   if (Object.keys(authChanges).length) {
     const { error } = await admin.auth.admin.updateUserById(id, authChanges);
     if (error) {
@@ -125,7 +134,8 @@ export async function updateEmployee(id: string, _prev: ActionResult | undefined
       department_id: input.department_id ?? null,
       date_of_joining: input.date_of_joining ?? null,
       basic_salary: input.basic_salary,
-      role: input.role,
+      role: access.role,
+      is_hr: access.is_hr,
       schedule: input.schedule,
       shift_start: input.schedule === "custom" ? input.shift_start : null,
       shift_end: input.schedule === "custom" ? input.shift_end : null,
@@ -225,8 +235,8 @@ export async function deleteDepartment(id: string): Promise<ActionResult> {
 export async function resetAdminTwoFactor(id: string): Promise<ActionResult> {
   const { supabase, profile: me } = await requireRole("admin");
   if (id === me.id) return { ok: false, error: "Change your own app from Settings instead." };
-  const { data: target } = await supabase.from("profiles").select("role").eq("id", id).single();
-  if (target?.role !== "admin") return { ok: false, error: "Only admins use 2-step sign-in." };
+  const { data: target } = await supabase.from("profiles").select("role, is_hr").eq("id", id).single();
+  if (!target || (target.role !== "admin" && !target.is_hr)) return { ok: false, error: "Only admins and HR use 2-step sign-in." };
 
   const admin = createAdminClient();
   const { data, error } = await admin.auth.admin.mfa.listFactors({ userId: id });

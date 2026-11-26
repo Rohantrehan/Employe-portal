@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LogOut, Menu, X } from "lucide-react";
+import { ArrowLeftRight, LogOut, Menu, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Wordmark } from "@/components/ui/logo";
 import { Avatar } from "@/components/ui/misc";
@@ -13,8 +13,10 @@ export type ShellUser = { name: string; email: string; avatarUrl?: string | null
 
 /** Counts shown next to menu items, by href. An item marked `optional` only shows when it has an entry here. */
 export type NavBadges = Record<string, number>;
+/** HR use both areas: a link to the other one. */
+export type AreaSwitch = { href: string; label: string };
 
-function Sidebar({ area, user, badges, onNavigate }: { area: Area; user: ShellUser; badges?: NavBadges; onNavigate?: () => void }) {
+function Sidebar({ area, user, badges, switchTo, onNavigate }: { area: Area; user: ShellUser; badges?: NavBadges; switchTo?: AreaSwitch; onNavigate?: () => void }) {
   const pathname = usePathname();
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-rail text-rail-text">
@@ -78,6 +80,21 @@ function Sidebar({ area, user, badges, onNavigate }: { area: Area; user: ShellUs
         ))}
       </nav>
 
+      {switchTo && (
+        <div className="relative px-3 pb-2">
+          <Link
+            href={switchTo.href}
+            onClick={onNavigate}
+            className="flex items-center gap-3 rounded-xl border border-white/[0.08] px-3 py-2 text-sm font-semibold text-white/85 transition-colors hover:bg-white/[0.06] hover:text-white"
+          >
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-white/[0.06]">
+              <ArrowLeftRight className="h-[17px] w-[17px]" />
+            </span>
+            {switchTo.label}
+          </Link>
+        </div>
+      )}
+
       <div className="relative border-t border-white/[0.06] p-3">
         <div className="flex items-center gap-3 rounded-xl px-3 py-2.5">
           <Avatar name={user.name} src={user.avatarUrl} size={36} className="!bg-white/10" />
@@ -106,11 +123,13 @@ export function AppShell({
   user,
   topbarRight,
   badges,
+  switchTo,
   children,
 }: {
   area: Area;
   user: ShellUser;
   badges?: NavBadges;
+  switchTo?: AreaSwitch;
   topbarRight?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -135,7 +154,7 @@ export function AppShell({
     <div className="min-h-screen bg-app">
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] lg:block">
-        <Sidebar area={area} user={user} badges={badges} />
+        <Sidebar area={area} user={user} badges={badges} switchTo={switchTo} />
       </aside>
 
       {/* Mobile drawer */}
@@ -150,7 +169,7 @@ export function AppShell({
             open ? "translate-x-0" : "-translate-x-full",
           )}
         >
-          <Sidebar area={area} user={user} badges={badges} onNavigate={() => setOpen(false)} />
+          <Sidebar area={area} user={user} badges={badges} switchTo={switchTo} onNavigate={() => setOpen(false)} />
           <button
             onClick={() => setOpen(false)}
             aria-label="Close menu"

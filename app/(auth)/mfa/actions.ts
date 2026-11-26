@@ -1,6 +1,6 @@
 "use server";
 
-import { getSession } from "@/lib/auth";
+import { getSession, hasAdminRights } from "@/lib/auth";
 
 export type EnrollResult = { ok: true; factorId: string; qr: string; secret: string } | { ok: false; error: string };
 export type VerifyResult = { ok: true } | { ok: false; error: string };
@@ -9,7 +9,7 @@ const ISSUER = "RohTre Media Portal";
 
 async function adminSession() {
   const session = await getSession();
-  if (!session?.profile || session.profile.role !== "admin" || !session.profile.is_active) return null;
+  if (!session?.profile || !hasAdminRights(session.profile) || !session.profile.is_active) return null;
   return session;
 }
 

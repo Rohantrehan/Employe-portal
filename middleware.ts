@@ -46,14 +46,18 @@ export async function middleware(request: NextRequest) {
 
   if (user) {
     // role lives in app_metadata (set server-side only), so no DB call is needed here
-    const role = (user.app_metadata as { role?: string } | undefined)?.role === "admin" ? "admin" : "employee";
-    const home = role === "admin" ? "/admin" : "/app";
-    // Admins must pass the authenticator-app step before anything else.
-    if (role === "admin" && user.aal !== "aal2" && path !== "/mfa" && !isPublic(path)) return redirectTo("/mfa");
-    if (role === "admin" && user.aal !== "aal2" && path === "/login") return redirectTo("/mfa");
-    if (path === "/" || path === "/login" || (role === "employee" && path === "/mfa")) return redirectTo(home);
+    const meta = user.app_metadata as { role?: string; hr?: boolean } | undefined;
+    const role = meta?.role === "admin" ? "admin" : "employee";
+    // HR: an employee with admin rights; uses both areas.
+    const hr = role === "employee" && meta?.hr === true;
+    const adminRights = role === "admin" || hr;
+    const home = adminRights ? "/admin" : "/app";
+    // Admins and HR must pass the authenticator-app step before anything else.
+    if (adminRights && user.aal !== "aal2" && path !== "/mfa" && !isPublic(path)) return redirectTo("/mfa");
+    if (adminRights && user.aal !== "aal2" && path === "/login") return redirectTo("/mfa");
+    if (path === "/" || path === "/login" || (!adminRights && path === "/mfa")) return redirectTo(home);
     // Wrong area → own home (layouts re-check this against the database)
-    if (role === "employee" && (path === "/admin" || path.startsWith("/admin/"))) return redirectTo(home);
+    if (!adminRights && (path === "/admin" || path.startsWith("/admin/"))) return redirectTo(home);
     if (role === "admin" && (path === "/app" || path.startsWith("/app/") || path === "/former")) return redirectTo(home);
   }
 

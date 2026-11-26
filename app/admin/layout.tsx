@@ -14,7 +14,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <AppShell
       area="admin"
       badges={{ "/admin/requests": unread, "/admin/access": ((rotation ?? []) as unknown[]).length }}
-      user={{ name: profile.full_name, email: profile.email, avatarUrl: profile.avatar_url, subtitle: "Administrator" }}
+      user={{ name: profile.full_name, email: profile.email, avatarUrl: profile.avatar_url, subtitle: profile.is_hr ? "HR" : "Administrator" }}
+      switchTo={profile.is_hr ? { href: "/app", label: "My space (clock in)" } : undefined}
     >
       {children}
     </AppShell>

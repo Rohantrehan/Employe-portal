@@ -14,7 +14,7 @@ export type EmployeeDefaults = {
   department_id?: string | null;
   date_of_joining?: string | null;
   basic_salary?: number | null;
-  role?: "employee" | "admin";
+  role?: "employee" | "hr" | "admin";
   schedule?: Schedule | null;
   shift_start?: string | null;
   shift_end?: string | null;
@@ -87,10 +87,11 @@ export function EmployeeFields({
         name="role"
         defaultValue={defaults.role ?? "employee"}
         disabled={lockRole}
-        hint={lockRole ? "You can't change your own access." : "Admins can see and manage everyone."}
+        hint={lockRole ? "You can't change your own access." : "Admins and HR can see and manage everyone. HR also clocks in and takes leave like an employee."}
         error={errors.role}
       >
         <option value="employee">Employee</option>
+        <option value="hr">HR (employee + admin)</option>
         <option value="admin">Admin</option>
       </Select>
       {lockRole && <input type="hidden" name="role" value={defaults.role ?? "admin"} />}

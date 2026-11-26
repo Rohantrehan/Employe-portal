@@ -49,7 +49,8 @@ const baseSchema = z.object({
     .nullable()
     .optional(),
   basic_salary: z.coerce.number({ message: "Enter an amount" }).min(0, "Cannot be negative").max(100_000_000, "Too large"),
-  role: z.enum(["employee", "admin"]).default("employee"),
+  /** Form value: HR is stored as an employee with is_hr. */
+  role: z.enum(["employee", "hr", "admin"]).default("employee"),
   schedule: z.enum(["standard", "custom", "none"]).default("standard"),
   shift_start: hhmm,
   shift_end: hhmm,
