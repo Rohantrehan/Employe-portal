@@ -32,11 +32,11 @@ function Sidebar({ area, user, badges, onNavigate }: { area: Area; user: ShellUs
         </span>
       </div>
 
-      <nav className="relative flex-1 overflow-y-auto px-3 py-3" aria-label="Main">
+      <nav className="rail-scroll relative flex-1 overflow-y-auto px-3 py-2" aria-label="Main">
         {NAV[area].map((group, gi) => (
-          <div key={gi} className={cn(gi > 0 && "mt-5")}>
+          <div key={gi} className={cn(gi > 0 && "mt-4")}>
             {group.title && (
-              <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">{group.title}</p>
+              <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">{group.title}</p>
             )}
             <ul className="space-y-0.5">
               {group.items.filter((item) => !item.optional || badges?.[item.href] !== undefined).map((item) => {
@@ -50,7 +50,7 @@ function Sidebar({ area, user, badges, onNavigate }: { area: Area; user: ShellUs
                       onClick={onNavigate}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors duration-200",
+                        "group relative flex items-center gap-3 rounded-xl px-3 py-[7px] text-sm font-semibold transition-colors duration-200",
                         active ? "bg-white/[0.07] text-white" : "hover:bg-white/[0.04] hover:text-white",
                       )}
                     >

@@ -122,3 +122,10 @@
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Sidebar menu: thin dark scrollbar that matches the rail (only shows when the menu doesn't fit). */
+.rail-scroll { scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / 0.14) transparent; }
+.rail-scroll::-webkit-scrollbar { width: 6px; }
+.rail-scroll::-webkit-scrollbar-track { background: transparent; }
+.rail-scroll::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 0.14); border-radius: 999px; }
+.rail-scroll::-webkit-scrollbar-thumb:hover { background: rgb(255 255 255 / 0.25); }
