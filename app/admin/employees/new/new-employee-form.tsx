@@ -8,14 +8,15 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { createEmployee } from "../actions";
 import { CredentialsPanel } from "../credentials-panel";
 import { EmployeeFields, type Department } from "../employee-fields";
+import { ExistingContractFields, type ContractLeaveType } from "./existing-contract-fields";
 
 /** Changing the key remounts the form, which clears the action state for "Add another". */
-export function NewEmployeeForm({ departments }: { departments: Department[] }) {
+export function NewEmployeeForm({ departments, contractTypes }: { departments: Department[]; contractTypes: ContractLeaveType[] }) {
   const [round, setRound] = useState(0);
-  return <NewEmployeeFormInner key={round} departments={departments} onAddAnother={() => setRound((r) => r + 1)} />;
+  return <NewEmployeeFormInner key={round} departments={departments} contractTypes={contractTypes} onAddAnother={() => setRound((r) => r + 1)} />;
 }
 
-function NewEmployeeFormInner({ departments, onAddAnother }: { departments: Department[]; onAddAnother: () => void }) {
+function NewEmployeeFormInner({ departments, contractTypes, onAddAnother }: { departments: Department[]; contractTypes: ContractLeaveType[]; onAddAnother: () => void }) {
   const [state, action, pending] = useActionState(createEmployee, undefined);
 
   if (state?.ok && state.data) {
@@ -35,12 +36,7 @@ function NewEmployeeFormInner({ departments, onAddAnother }: { departments: Depa
           <div className="mt-6">
             <CredentialsPanel email={email} password={password} />
           </div>
-          <p className="mt-5 rounded-2xl bg-soft px-4 py-3 text-[13px] text-body">
-            <b className="text-ink">Already works here on a paper contract?</b> Record that contract and the paid leave they have left:{" "}
-            <Link href={`/admin/employees/${id}#contract-leave`} className="font-semibold text-brand hover:underline">
-              Record existing contract
-            </Link>
-          </p>
+          {state.message && <p className="mt-5 rounded-2xl bg-success-tint px-4 py-3 text-[13px] font-medium text-success">{state.message}</p>}
           <div className="mt-6 flex flex-wrap gap-2">
             <Link href={`/admin/employees/${id}`} className={buttonClass("primary")}>
               View employee <ArrowRight className="h-4 w-4" />
@@ -68,6 +64,11 @@ function NewEmployeeFormInner({ departments, onAddAnother }: { departments: Depa
           )}
           <EmployeeFields departments={departments} errors={errors} />
         </CardBody>
+        <div className="border-t border-line px-5 py-5 sm:px-6">
+          <h3 className="text-base font-bold tracking-[-0.01em] text-ink">Contract &amp; leave</h3>
+          <p className="mb-4 mt-0.5 text-sm text-body">Is this a new joiner, or someone who already works here and has unused leave?</p>
+          <ExistingContractFields types={contractTypes} errors={errors} />
+        </div>
         <div className="flex flex-wrap justify-end gap-2 border-t border-line px-5 py-4 sm:px-6">
           <Link href="/admin/employees" className={buttonClass("secondary")}>
             Cancel

@@ -9,7 +9,10 @@ export const metadata: Metadata = { title: "Add employee" };
 
 export default async function NewEmployeePage() {
   const { supabase } = await requireRole("admin");
-  const { data: departments } = await supabase.from("departments").select("id, name").order("name");
+  const [{ data: departments }, { data: types }] = await Promise.all([
+    supabase.from("departments").select("id, name").order("name"),
+    supabase.from("leave_types").select("id, name, contract_quota").eq("tracks_balance", true).eq("is_active", true).not("contract_quota", "is", null).order("sort_order"),
+  ]);
 
   return (
     <>
@@ -18,7 +21,7 @@ export default async function NewEmployeePage() {
       </Link>
       <PageHeader className="mt-2" eyebrow="People" title="Add employee" description="Create a login for a new team member." />
       <div className="mt-8">
-        <NewEmployeeForm departments={departments ?? []} />
+        <NewEmployeeForm departments={departments ?? []} contractTypes={(types ?? []).map((t) => ({ ...t, contract_quota: Number(t.contract_quota) }))} />
       </div>
     </>
   );

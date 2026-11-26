@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireRole } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { tempPassword } from "@/lib/password";
+import { formatDate } from "@/lib/format";
 import { employeeSchema, fieldErrorsOf } from "./schema";
 
 export type ActionResult<T = undefined> =
@@ -17,6 +18,31 @@ function accessOf(access: "employee" | "hr" | "admin") {
   return { role, is_hr: access === "hr", meta: { role, hr: access === "hr" } } as const;
 }
 const accessLabel = (p: { role: string; is_hr?: boolean | null }) => (p.role === "admin" ? "admin" : p.is_hr ? "hr" : "employee");
+
+/** "Already works here" part of the new-employee form. */
+function readExistingContract(raw: Record<string, string>):
+  | { ok: true; contract: { from: string; to: string; left: Record<string, number> } | null }
+  | { ok: false; fieldErrors: Record<string, string> } {
+  if (raw.existing !== "yes") return { ok: true, contract: null };
+  const errs: Record<string, string> = {};
+  const from = raw.contract_from ?? "";
+  const to = raw.contract_to ?? "";
+  const isDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
+  if (!isDate(from)) errs.contract_from = "Pick when the current contract started";
+  if (!isDate(to)) errs.contract_to = "Pick when it ends";
+  else if (isDate(from) && to < from) errs.contract_to = "The end is before the start";
+  const left: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (!k.startsWith("left_")) continue;
+    const typeId = k.slice(5);
+    if (!/^[0-9a-f-]{36}$/i.test(typeId)) continue;
+    if (v.trim() === "") continue;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0 || n > 365 || n * 2 !== Math.floor(n * 2)) errs[k] = "Use whole or half days, 0 to 365";
+    else left[typeId] = n;
+  }
+  return Object.keys(errs).length ? { ok: false, fieldErrors: errs } : { ok: true, contract: { from, to, left } };
+}
 
 const BAN_FOREVER = "876000h"; // ~100 years
 
@@ -38,8 +64,12 @@ export async function createEmployee(
   formData: FormData,
 ): Promise<ActionResult<{ id: string; email: string; password: string }>> {
   const { supabase } = await requireRole("admin");
-  const parsed = employeeSchema.safeParse(formToObject(formData));
-  if (!parsed.success) return { ok: false, fieldErrors: fieldErrorsOf(parsed.error) };
+  const raw = formToObject(formData);
+  const parsed = employeeSchema.safeParse(raw);
+  const existing = readExistingContract(raw);
+  if (!parsed.success || !existing.ok) {
+    return { ok: false, fieldErrors: { ...(parsed.success ? {} : fieldErrorsOf(parsed.error)), ...(existing.ok ? {} : existing.fieldErrors) } };
+  }
   const input = parsed.data;
 
   const access = accessOf(input.role);
@@ -85,6 +115,16 @@ export async function createEmployee(
     return { ok: false, ...friendlyDbError(profileError.message) };
   }
 
+  // Someone who already works here: record their current paper contract and the leave they have left.
+  if (existing.contract) {
+    const c = existing.contract;
+    const { error: ce } = await supabase.rpc("record_contract", { p_id: null, p_employee: id, p_from: c.from, p_to: c.to, p_note: "Added with the employee", p_left: c.left });
+    if (ce) {
+      await admin.auth.admin.deleteUser(id);
+      return { ok: false, error: ce.code === "P0001" ? ce.message : "Could not save the contract. Nothing was created." };
+    }
+  }
+
   await supabase.rpc("log_action", {
     p_action: "employee.create",
     p_entity: "profile",
@@ -92,7 +132,11 @@ export async function createEmployee(
     p_payload: { email: input.email, role: input.role },
   });
   revalidatePath("/admin/employees");
-  return { ok: true, data: { id, email: input.email, password } };
+  revalidatePath("/admin");
+  const message = existing.contract
+    ? `Contract ${formatDate(existing.contract.from)} to ${formatDate(existing.contract.to)} saved with their unused leave. You can change it on their page under "Contracts & paid leave".`
+    : undefined;
+  return { ok: true, data: { id, email: input.email, password }, message };
 }
 
 // ---------------------------------------------------------------------

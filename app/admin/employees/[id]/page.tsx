@@ -174,6 +174,18 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
             shift_end: emp.shift_end,
           }}
         />
+        {emp.role === "employee" && (
+          <div id="contract-leave">
+            <ContractLeavePanel
+              employeeId={emp.id}
+              firstName={firstName}
+              contracts={panelContracts}
+              balances={panelBalances}
+              types={panelTypes}
+              today={today}
+            />
+          </div>
+        )}
         <div id="contract">
           <HirePanel
             employee={{
@@ -194,18 +206,6 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
             today={today}
           />
         </div>
-        {emp.role === "employee" && (
-          <div id="contract-leave">
-            <ContractLeavePanel
-              employeeId={emp.id}
-              firstName={firstName}
-              contracts={panelContracts}
-              balances={panelBalances}
-              types={panelTypes}
-              today={today}
-            />
-          </div>
-        )}
         {(!exit || allTasks.some((t) => t.kind === "onboarding")) && (
         <div id="onboarding">
           <ChecklistPanel
